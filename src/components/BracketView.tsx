@@ -14,7 +14,7 @@ import type { Dict } from "@/lib/i18n/dictionary";
 type ViewMode = "groups" | "tree" | "list";
 type StatusFilter = "all" | "live" | "upcoming" | "finished";
 
-const ROUND_ORDER: Round[] = ["R1", "R16", "QF", "SF", "F"];
+const ROUND_ORDER: Round[] = ["G", "R1", "R16", "QF", "SF", "F"];
 
 export function BracketView({
   matches: allMatches,
@@ -31,12 +31,13 @@ export function BracketView({
 }) {
   useLiveRefresh();
 
-  // The group stage and the tree are two different shapes of the same table,
-  // so they get two different views rather than one confused list.
+  // The group stage and the tree are two different shapes of the same table, so
+  // the tables and the tree each get their own view. The list is the one place
+  // that shows the tournament whole, group matches included.
   const groups = useMemo(() => groupsFromMatches(allMatches), [allMatches]);
-  const matches = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
+  const knockout = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
   const hasGroups = groups.length > 0;
-  const knockoutStarted = matches.length > 0;
+  const knockoutStarted = knockout.length > 0;
 
   const [view, setView] = useState<ViewMode>(hasGroups && !knockoutStarted ? "groups" : "tree");
   const [tab, setTab] = useState<"all" | Round>("all");
@@ -54,10 +55,10 @@ export function BracketView({
     window.localStorage.setItem("bracketView", v);
   };
 
-  const finalMatch = matches.find((m) => m.round === "F");
+  const finalMatch = knockout.find((m) => m.round === "F");
   const childrenMap = useMemo(() => {
     const map = new Map<string, Match[]>();
-    for (const m of matches) {
+    for (const m of knockout) {
       if (m.next_match_id) {
         const arr = map.get(m.next_match_id) ?? [];
         arr.push(m);
@@ -65,11 +66,11 @@ export function BracketView({
       }
     }
     return map;
-  }, [matches]);
+  }, [knockout]);
 
   const roundsPresent = useMemo(
-    () => ROUND_ORDER.filter((r) => matches.some((m) => m.round === r)),
-    [matches]
+    () => ROUND_ORDER.filter((r) => allMatches.some((m) => m.round === r)),
+    [allMatches]
   );
 
   const classify = (m: Match): StatusFilter => {
@@ -78,10 +79,18 @@ export function BracketView({
     return "upcoming";
   };
 
-  const filtered = matches
+  // With both stages in one list, a raw slot number no longer orders anything:
+  // group and knockout matches number themselves separately.
+  const byBracketOrder = (a: Match, b: Match) =>
+    ROUND_ORDER.indexOf(a.round) - ROUND_ORDER.indexOf(b.round) ||
+    (a.group_no ?? 0) - (b.group_no ?? 0) ||
+    a.bracket_slot - b.bracket_slot;
+
+  const filtered = allMatches
     .filter((m) => tab === "all" || m.round === tab)
     .filter((m) => status === "all" || classify(m) === status)
-    .filter((m) => m.player1_id || m.player2_id || tab !== "all");
+    .filter((m) => m.player1_id || m.player2_id || tab !== "all")
+    .sort(byBracketOrder);
 
   const live = filtered.filter((m) => classify(m) === "live");
   const upcoming = filtered
@@ -90,7 +99,7 @@ export function BracketView({
       if (a.scheduled_at && b.scheduled_at) return a.scheduled_at.localeCompare(b.scheduled_at);
       if (a.scheduled_at) return -1;
       if (b.scheduled_at) return 1;
-      return a.bracket_slot - b.bracket_slot;
+      return byBracketOrder(a, b);
     });
   const finished = filtered
     .filter((m) => classify(m) === "finished")
@@ -98,8 +107,10 @@ export function BracketView({
 
   const feed = tab === "all" && status === "all" ? [...live, ...upcoming, ...finished] : filtered;
 
-  // Before the qualifiers are seeded there is no tree to be empty about.
-  const emptyKnockout = hasGroups && !knockoutStarted ? t.groups.knockoutPending : t.bracket.nothingHere;
+  // Before the qualifiers are seeded there is no tree to be empty about. The
+  // list has the group matches to fall back on, so an empty one there is just
+  // a filter that matched nothing.
+  const emptyTree = hasGroups && !knockoutStarted ? t.groups.knockoutPending : t.bracket.nothingHere;
 
   const pill = (on: boolean) =>
     `shrink-0 rounded-full px-4 py-2.5 text-sm transition-colors ${
@@ -185,7 +196,7 @@ export function BracketView({
             </div>
           </div>
         ) : (
-          <p className="py-10 text-center text-sm text-fg/70">{emptyKnockout}</p>
+          <p className="py-10 text-center text-sm text-fg/70">{emptyTree}</p>
         ))}
 
       {view === "list" && (
@@ -195,7 +206,7 @@ export function BracketView({
               {t.bracket.all}
             </button>
             {roundsPresent.map((r) => {
-              const roundMatches = matches.filter((m) => m.round === r);
+              const roundMatches = allMatches.filter((m) => m.round === r);
               const allDone = roundMatches.every((m) => classify(m) === "finished");
               return (
                 <button
@@ -203,7 +214,8 @@ export function BracketView({
                   onClick={() => setTab(r)}
                   className={`${pill(tab === r)} inline-flex items-center gap-1.5`}
                 >
-                  {t.rounds[r]}
+                  {/* The full "group stage" wording is too long for a pill. */}
+                  {r === "G" ? t.groups.tab : t.rounds[r]}
                   {allDone && <Check size={13} strokeWidth={2.5} className="text-accent" />}
                 </button>
               );
@@ -227,7 +239,7 @@ export function BracketView({
           <div className="grid gap-3 sm:grid-cols-2">
             {feed.length === 0 && (
               <div className="liquid-glass-panel col-span-full rounded-2xl px-6 py-12 text-center text-sm text-fg/70">
-                {emptyKnockout}
+                {t.bracket.nothingHere}
               </div>
             )}
             {feed.map((m) => (

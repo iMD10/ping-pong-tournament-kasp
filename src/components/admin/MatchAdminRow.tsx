@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Radio, Pencil, CalendarClock, UserX, Users } from "lucide-react";
 import type { Match, Player } from "@/lib/supabase/types";
+import { groupLabel } from "@/lib/groups";
 import { formatScoreLine, gameWinCounts, gamesToWin, ROUND_LABELS_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
 import {
@@ -166,7 +167,10 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
   return (
     <div className={`liquid-glass-panel rounded-2xl p-4 ${match.is_live ? "glass-live" : ""}`}>
       <div className="mb-2.5 flex items-center justify-between">
-        <span className="text-[12px] uppercase tracking-wide text-fg/70">{ROUND_LABELS_AR[match.round]}</span>
+        <span className="text-[12px] uppercase tracking-wide text-fg/70">
+          {ROUND_LABELS_AR[match.round]}
+          {match.round === "G" && match.group_no != null && ` · ${groupLabel(match.group_no)}`}
+        </span>
         {canScore && (
           <button
             onClick={toggleLive}

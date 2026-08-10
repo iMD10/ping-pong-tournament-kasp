@@ -17,12 +17,15 @@ create table if not exists players (
 -- ---------------------------------------------------------------------------
 create table if not exists matches (
   id uuid primary key default gen_random_uuid(),
-  round text not null,                -- 'R1','R16','QF','SF','F','judge'
+  round text not null,                -- 'G','R1','R16','QF','SF','F','judge'
   bracket_slot int not null default 0, -- ordering within round
+  -- Group stage only: which group this round-robin match belongs to (0-based).
+  -- Null for every knockout match.
+  group_no int,
   player1_id uuid references players(id) on delete set null,
   player2_id uuid references players(id) on delete set null,
   -- Array of games: [{ score1, score2, decider_score1?, decider_score2? }, ...]
-  -- Every round is a single game except 'F' (best of 3, first to 2 game-wins).
+  -- Every round is a single game except 'SF' and 'F' (best of 3, first to 2).
   games jsonb not null default '[]'::jsonb,
   winner_id uuid references players(id) on delete set null,
   outcome_type text not null default 'pending', -- pending | score | absent | withdrew | bye
@@ -34,12 +37,21 @@ create table if not exists matches (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
 
-  constraint valid_outcome_type check (outcome_type in ('pending','score','absent','withdrew','bye')),
-  constraint valid_round check (round in ('R1','R16','QF','SF','F','judge'))
+  constraint valid_outcome_type check (outcome_type in ('pending','score','absent','withdrew','bye'))
 );
+
+-- For projects created before the group stage existed.
+alter table matches add column if not exists group_no int;
+
+-- Dropped first so re-running this file doesn't error on the older constraint,
+-- which didn't know about the group round.
+alter table matches drop constraint if exists valid_round;
+alter table matches add constraint valid_round
+  check (round in ('G','R1','R16','QF','SF','F','judge'));
 
 create index if not exists idx_matches_round on matches (round);
 create index if not exists idx_matches_next on matches (next_match_id);
+create index if not exists idx_matches_group on matches (group_no);
 
 -- ---------------------------------------------------------------------------
 -- tournament_state — single row, drives draw/reset/event date
@@ -59,6 +71,22 @@ create table if not exists tournament_state (
 -- For projects created before the shamat award existed.
 alter table tournament_state add column if not exists best_shamat_name text;
 alter table tournament_state add column if not exists best_shamat_quote text;
+
+-- ---------------------------------------------------------------------------
+-- Tournament format.
+--
+-- 'knockout' — the classic single-elimination tree, drawn in one go.
+-- 'groups'   — a round-robin group stage first; the top `advance_per_group` of
+--              each group then feed a knockout tree (16 qualifiers enter at the
+--              round of 16, 8 at the quarters, and so on).
+-- ---------------------------------------------------------------------------
+alter table tournament_state add column if not exists format text not null default 'knockout';
+alter table tournament_state add column if not exists group_count int;
+alter table tournament_state add column if not exists advance_per_group int;
+
+alter table tournament_state drop constraint if exists valid_format;
+alter table tournament_state add constraint valid_format
+  check (format in ('knockout','groups'));
 
 insert into tournament_state (id) values (1) on conflict (id) do nothing;
 

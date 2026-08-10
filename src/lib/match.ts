@@ -1,7 +1,8 @@
 import type { Game, Match, Round } from "@/lib/supabase/types";
 import { isMalKKleeja } from "@/lib/validation";
 
-/** Semifinal and final are best of 3 (first to 2 games); everything else is a single game. */
+/** Semifinal and final are best of 3 (first to 2 games); group matches and every
+ * earlier knockout round are a single game. */
 export function gamesToWin(round: Round): number {
   return round === "SF" || round === "F" ? 2 : 1;
 }
@@ -59,6 +60,7 @@ export function formatScoreLine(game: Game): string {
 }
 
 export const ROUND_LABELS_AR: Record<Round, string> = {
+  G: "دور المجموعات",
   R1: "الجولة الأولى",
   R16: "دور الـ16",
   QF: "ربع النهائي",
@@ -68,6 +70,7 @@ export const ROUND_LABELS_AR: Record<Round, string> = {
 };
 
 export const ROUND_LABELS_EN: Record<Round, string> = {
+  G: "Group stage",
   R1: "Round 1",
   R16: "Round of 16",
   QF: "Quarterfinal",

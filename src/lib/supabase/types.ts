@@ -1,7 +1,10 @@
-export type Round = "R1" | "R16" | "QF" | "SF" | "F" | "judge";
+/** 'G' is a group-stage round-robin match; everything else is a knockout round. */
+export type Round = "G" | "R1" | "R16" | "QF" | "SF" | "F" | "judge";
 export type OutcomeType = "pending" | "score" | "absent" | "withdrew" | "bye";
 /** idle = not started, live = papers being read out, done = bracket built. */
 export type DrawStatus = "idle" | "live" | "done";
+/** knockout = straight to the tree, groups = round-robin groups then the tree. */
+export type TournamentFormat = "knockout" | "groups";
 
 export interface Player {
   id: string;
@@ -20,6 +23,8 @@ export interface Match {
   id: string;
   round: Round;
   bracket_slot: number;
+  /** Group-stage matches only: which group (0-based). Null in the knockout. */
+  group_no: number | null;
   player1_id: string | null;
   player2_id: string | null;
   games: Game[];
@@ -46,6 +51,10 @@ export interface TournamentState {
   /** Seats in the live draw, frozen when it starts so a late roster change
    * can't reshape the grid under the audience. Null until then. */
   draw_size: number | null;
+  format: TournamentFormat;
+  /** Groups format only: how many groups, and how many of each qualify. */
+  group_count: number | null;
+  advance_per_group: number | null;
   updated_at: string;
 }
 

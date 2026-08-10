@@ -39,7 +39,12 @@ export default async function HallPage() {
     .flatMap((m) => m.games.filter((g) => g.decider_score1 != null))
     .sort((a, b) => Math.max(b.decider_score1!, b.decider_score2!) - Math.max(a.decider_score1!, a.decider_score2!))[0];
   const mostPoints = [...stats.values()].sort((a, b) => b.pointsFor - a.pointsFor)[0];
-  const fastestExit = [...scored].filter((m) => m.round === "R1").sort((a, b) => margin(b) - margin(a))[0];
+  // Whichever round the tournament opened with — groups when there is a group
+  // stage, round one when it's a straight knockout.
+  const openingRound = matches.some((m) => m.round === "G") ? "G" : "R1";
+  const fastestExit = [...scored]
+    .filter((m) => m.round === openingRound)
+    .sort((a, b) => margin(b) - margin(a))[0];
   const absentCount = matches.filter((m) => m.outcome_type === "absent").length;
 
   return (

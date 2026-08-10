@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import type { Game, Match, Player } from "@/lib/supabase/types";
+import { groupLabel } from "@/lib/groups";
 import { matchHasMalKKleeja } from "@/lib/match";
 import { playerName } from "@/lib/players";
 import type { Dict } from "@/lib/i18n/dictionary";
@@ -89,7 +90,10 @@ export function MatchCard({
       <div className="mb-3 flex items-center justify-between gap-2 text-[12px] uppercase tracking-wide text-fg/70">
         {/* Arabic descenders (the ي dots) sit below a default line box and get
             shaved by truncate's overflow:hidden, hence the roomier leading. */}
-        <span className="truncate leading-6">{t.rounds[match.round]}</span>
+        <span className="truncate leading-6">
+          {t.rounds[match.round]}
+          {match.round === "G" && match.group_no != null && ` · ${groupLabel(match.group_no)}`}
+        </span>
         {match.is_live ? (
           <span className="flex shrink-0 items-center gap-1.5 font-semibold text-live">
             <span className="animate-pulse-dot inline-block h-1.5 w-1.5 rounded-full bg-live" />

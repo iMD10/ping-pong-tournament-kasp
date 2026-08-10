@@ -7,7 +7,7 @@ export interface PlayerStats {
   losses: number;
   pointsFor: number;
   pointsAgainst: number;
-  eliminatedBy: string | null; // player id who ended this player's run
+  eliminatedBy: string | null; // player id who knocked this player out (knockout rounds only)
   malKKleejaCount: number; // times this player lost a match 7-0
 }
 
@@ -35,7 +35,9 @@ export function computeStats(players: Player[], matches: Match[]): Map<string, P
     if (winnerStats) winnerStats.wins += 1;
     if (loserStats) {
       loserStats.losses += 1;
-      loserStats.eliminatedBy = m.winner_id;
+      // Losing a group match costs you nothing but the win column; only a
+      // knockout defeat actually ends the run.
+      if (m.round !== "G") loserStats.eliminatedBy = m.winner_id;
     }
 
     if (m.outcome_type === "score" && m.games.length > 0) {

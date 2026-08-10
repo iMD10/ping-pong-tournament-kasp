@@ -1,39 +1,53 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Check, LayoutList, Network, Trophy } from "lucide-react";
+import { Check, LayoutList, Network, Trophy, Users } from "lucide-react";
 import type { Match, Player, Round } from "@/lib/supabase/types";
+import { groupsFromMatches } from "@/lib/groups";
 import { playerName } from "@/lib/players";
+import { GroupTable } from "@/components/GroupTable";
 import { MatchCard } from "@/components/MatchCard";
 import { TreeNode } from "@/components/TreeNode";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
 import type { Dict } from "@/lib/i18n/dictionary";
 
-type ViewMode = "tree" | "list";
+type ViewMode = "groups" | "tree" | "list";
 type StatusFilter = "all" | "live" | "upcoming" | "finished";
 
 const ROUND_ORDER: Round[] = ["R1", "R16", "QF", "SF", "F"];
 
 export function BracketView({
-  matches,
+  matches: allMatches,
   players,
+  advancePerGroup,
   t,
   locale,
 }: {
   matches: Match[];
   players: Player[];
+  advancePerGroup: number;
   t: Dict;
   locale: string;
 }) {
   useLiveRefresh();
-  const [view, setView] = useState<ViewMode>("tree");
+
+  // The group stage and the tree are two different shapes of the same table,
+  // so they get two different views rather than one confused list.
+  const groups = useMemo(() => groupsFromMatches(allMatches), [allMatches]);
+  const matches = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
+  const hasGroups = groups.length > 0;
+  const knockoutStarted = matches.length > 0;
+
+  const [view, setView] = useState<ViewMode>(hasGroups && !knockoutStarted ? "groups" : "tree");
   const [tab, setTab] = useState<"all" | Round>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem("bracketView") as ViewMode | null;
-    if (stored) setView(stored);
-  }, []);
+    // A stored preference only applies to the views this tournament actually
+    // has: no groups means no groups tab to restore.
+    const stored = window.localStorage.getItem("bracketView");
+    if (stored === "tree" || stored === "list" || (stored === "groups" && hasGroups)) setView(stored);
+  }, [hasGroups]);
 
   const changeView = (v: ViewMode) => {
     setView(v);
@@ -84,6 +98,9 @@ export function BracketView({
 
   const feed = tab === "all" && status === "all" ? [...live, ...upcoming, ...finished] : filtered;
 
+  // Before the qualifiers are seeded there is no tree to be empty about.
+  const emptyKnockout = hasGroups && !knockoutStarted ? t.groups.knockoutPending : t.bracket.nothingHere;
+
   const pill = (on: boolean) =>
     `shrink-0 rounded-full px-4 py-2.5 text-sm transition-colors ${
       on ? "bg-fg text-bg font-medium" : "liquid-glass text-fg/70 hover:text-fg"
@@ -93,6 +110,17 @@ export function BracketView({
     <div className="flex flex-col gap-5">
       <div className="flex justify-center">
         <div className="liquid-glass flex items-center gap-1 rounded-xl p-1.5">
+          {hasGroups && (
+            <button
+              onClick={() => changeView("groups")}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm transition-colors ${
+                view === "groups" ? "bg-fg/10 font-medium text-fg" : "text-fg/70 hover:text-fg"
+              }`}
+            >
+              <Users size={15} strokeWidth={1.75} />
+              {t.groups.tab}
+            </button>
+          )}
           <button
             onClick={() => changeView("tree")}
             className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm transition-colors ${
@@ -113,6 +141,27 @@ export function BracketView({
           </button>
         </div>
       </div>
+
+      {view === "groups" && (
+        <div className="flex flex-col gap-8">
+          <p className="text-center text-xs text-fg/55">{t.groups.qualifiedNote}</p>
+          {groups.map((group) => (
+            <section key={group.groupNo} className="flex flex-col gap-3">
+              <GroupTable group={group} players={players} advance={advancePerGroup} t={t} />
+              <details>
+                <summary className="cursor-pointer list-none text-xs text-fg/55 transition-colors hover:text-fg/80">
+                  {t.groups.matches} ({group.total})
+                </summary>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  {group.matches.map((m) => (
+                    <MatchCard key={m.id} match={m} players={players} t={t} locale={locale} />
+                  ))}
+                </div>
+              </details>
+            </section>
+          ))}
+        </div>
+      )}
 
       {view === "tree" &&
         (finalMatch ? (
@@ -136,7 +185,7 @@ export function BracketView({
             </div>
           </div>
         ) : (
-          <p className="py-10 text-center text-sm text-fg/70">{t.bracket.nothingHere}</p>
+          <p className="py-10 text-center text-sm text-fg/70">{emptyKnockout}</p>
         ))}
 
       {view === "list" && (
@@ -178,7 +227,7 @@ export function BracketView({
           <div className="grid gap-3 sm:grid-cols-2">
             {feed.length === 0 && (
               <div className="liquid-glass-panel col-span-full rounded-2xl px-6 py-12 text-center text-sm text-fg/70">
-                {t.bracket.nothingHere}
+                {emptyKnockout}
               </div>
             )}
             {feed.map((m) => (

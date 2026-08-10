@@ -76,6 +76,35 @@ create table if not exists statements (
 create index if not exists idx_statements_created on statements (created_at);
 
 -- ---------------------------------------------------------------------------
+-- draw_slots — the live draw («القرعة على الهواء»).
+--
+-- The draw itself happens in the room with paper slips; this table is only the
+-- scoreboard for it. One row per *filled* first-round seat: seat i belongs to
+-- match floor(i/2), side (i%2)+1, out of `tournament_state.draw_size` seats.
+-- Rows land one at a time as each paper is read out, and every spectator's page
+-- updates over Realtime. An empty seat next to a filled one is a bye.
+--
+-- The real `matches` tree is not built here — it is built once, from these
+-- seats, when the admin confirms the draw.
+-- ---------------------------------------------------------------------------
+create table if not exists draw_slots (
+  seat int primary key,
+  player_id uuid not null references players(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+-- A player can only come out of the bag once.
+create unique index if not exists idx_draw_slots_player on draw_slots (player_id);
+
+alter table tournament_state add column if not exists draw_status text not null default 'idle';
+alter table tournament_state add column if not exists draw_size int;
+
+-- Dropped first so re-running this file doesn't error on an existing constraint.
+alter table tournament_state drop constraint if exists valid_draw_status;
+alter table tournament_state add constraint valid_draw_status
+  check (draw_status in ('idle','live','done'));
+
+-- ---------------------------------------------------------------------------
 -- updated_at triggers
 -- ---------------------------------------------------------------------------
 create or replace function set_updated_at() returns trigger as $$
@@ -100,6 +129,7 @@ alter table players enable row level security;
 alter table matches enable row level security;
 alter table tournament_state enable row level security;
 alter table statements enable row level security;
+alter table draw_slots enable row level security;
 
 drop policy if exists "public read players" on players;
 create policy "public read players" on players for select using (true);
@@ -125,6 +155,12 @@ drop policy if exists "admin write statements" on statements;
 create policy "admin write statements" on statements for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
+drop policy if exists "public read draw slots" on draw_slots;
+create policy "public read draw slots" on draw_slots for select using (true);
+drop policy if exists "admin write draw slots" on draw_slots;
+create policy "admin write draw slots" on draw_slots for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
 -- ---------------------------------------------------------------------------
 -- Realtime: add tables to the supabase_realtime publication.
 -- Every add is guarded: `alter publication ... add table` errors if the table
@@ -139,7 +175,7 @@ begin
     return;
   end if;
 
-  foreach t in array array['players','matches','tournament_state','statements'] loop
+  foreach t in array array['players','matches','tournament_state','statements','draw_slots'] loop
     if not exists (
       select 1 from pg_publication_tables
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t

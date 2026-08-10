@@ -7,6 +7,7 @@ import { HeroBadge } from "@/components/HeroBadge";
 import { HeroText } from "@/components/HeroText";
 import { BottomLeftCard } from "@/components/BottomLeftCard";
 import { BottomRightCorner } from "@/components/BottomRightCorner";
+import { OnAirBanner } from "@/components/OnAirBanner";
 import { getLang, getT } from "@/lib/i18n/server";
 
 export const revalidate = 0;
@@ -85,10 +86,14 @@ export default async function HomePage() {
 
       <section className="mx-auto max-w-5xl px-4 py-14 sm:px-12 sm:py-16">
         {!state?.drawn ? (
-          <div className="liquid-glass-panel rounded-2xl px-6 py-14 text-center">
-            <KleejaIcon className="animate-float-ball mx-auto mb-4 h-12 w-12 opacity-60" />
-            <p className="text-sm text-fg/70">{t.home.notDrawn}</p>
-          </div>
+          state?.draw_status === "live" ? (
+            <OnAirBanner title={t.draw.onAir} cta={t.draw.watch} />
+          ) : (
+            <div className="liquid-glass-panel rounded-2xl px-6 py-14 text-center">
+              <KleejaIcon className="animate-float-ball mx-auto mb-4 h-12 w-12 opacity-60" />
+              <p className="text-sm text-fg/70">{t.home.notDrawn}</p>
+            </div>
+          )
         ) : upcoming.length > 0 ? (
           <>
             <h2 className="mb-5 text-lg font-medium tracking-tight text-fg/90">{t.home.upcoming}</h2>

@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getJudgeMatch, getMatches, getPlayers, getState, getStatements } from "@/lib/data";
+import { getDrawSlots, getJudgeMatch, getMatches, getPlayers, getState, getStatements } from "@/lib/data";
 import { LoginForm } from "@/components/admin/LoginForm";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
@@ -21,12 +21,13 @@ export default async function AdminPage() {
     );
   }
 
-  const [players, matches, judgeMatch, state, statements] = await Promise.all([
+  const [players, matches, judgeMatch, state, statements, drawSlots] = await Promise.all([
     getPlayers(),
     getMatches(),
     getJudgeMatch(),
     getState(),
     getStatements(),
+    getDrawSlots(),
   ]);
 
   return (
@@ -37,6 +38,7 @@ export default async function AdminPage() {
         judgeMatch={judgeMatch}
         state={state}
         statements={statements}
+        drawSlots={drawSlots}
       />
     </main>
   );

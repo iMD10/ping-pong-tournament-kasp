@@ -10,11 +10,13 @@ export function DrawPanel({
   playerCount,
   manualOpen,
   onToggleManual,
+  liveDrawRunning,
 }: {
   drawn: boolean;
   playerCount: number;
   manualOpen: boolean;
   onToggleManual: () => void;
+  liveDrawRunning: boolean;
 }) {
   const router = useRouter();
   const [confirmingDraw, setConfirmingDraw] = useState(false);
@@ -47,7 +49,11 @@ export function DrawPanel({
       <h2 className="mb-4 font-medium text-fg">القرعة</h2>
       {error && <p className="mb-3 text-xs text-live">{error}</p>}
 
-      {!drawn ? (
+      {liveDrawRunning && !drawn ? (
+        <p className="text-sm text-fg/70">
+          فيه قرعة شغالة على الهواء تحت. أنهها أو ألغها لو تبي تسحب من هنا.
+        </p>
+      ) : !drawn ? (
         confirmingDraw ? (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-fg/70">

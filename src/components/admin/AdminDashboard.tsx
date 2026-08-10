@@ -6,12 +6,13 @@ import { signOut } from "@/lib/actions";
 import { PlayerManager } from "@/components/admin/PlayerManager";
 import { DrawPanel } from "@/components/admin/DrawPanel";
 import { ManualDrawPanel } from "@/components/admin/ManualDrawPanel";
+import { LiveDrawPanel } from "@/components/admin/LiveDrawPanel";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
 import { JudgeMatchPanel } from "@/components/admin/JudgeMatchPanel";
 import { ShamatPanel } from "@/components/admin/ShamatPanel";
 import { StatementsPanel } from "@/components/admin/StatementsPanel";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
-import type { Match, Player, Statement, TournamentState } from "@/lib/supabase/types";
+import type { DrawSlot, Match, Player, Statement, TournamentState } from "@/lib/supabase/types";
 
 const ROUND_RANK: Record<string, number> = { R1: 0, R16: 1, QF: 2, SF: 3, F: 4, judge: 5 };
 
@@ -21,15 +22,19 @@ export function AdminDashboard({
   judgeMatch,
   state,
   statements,
+  drawSlots,
 }: {
   players: Player[];
   matches: Match[];
   judgeMatch: Match | null;
   state: TournamentState | null;
   statements: Statement[];
+  drawSlots: DrawSlot[];
 }) {
-  useLiveRefresh(["matches", "tournament_state", "statements"]);
+  useLiveRefresh(["matches", "tournament_state", "statements", "draw_slots"]);
   const [manualOpen, setManualOpen] = useState(false);
+  const drawStatus = state?.draw_status ?? "idle";
+  const liveDrawRunning = drawStatus === "live";
 
   const sorted = [...matches].sort(
     (a, b) => (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot
@@ -58,12 +63,22 @@ export function AdminDashboard({
           playerCount={players.length}
           manualOpen={manualOpen}
           onToggleManual={() => setManualOpen((v) => !v)}
+          liveDrawRunning={liveDrawRunning}
         />
       </div>
 
-      {!state?.drawn && manualOpen && players.length >= 2 && (
+      {!state?.drawn && !liveDrawRunning && manualOpen && players.length >= 2 && (
         // Remount when the roster size changes so the slot grid matches it.
         <ManualDrawPanel key={players.length} players={players} onClose={() => setManualOpen(false)} />
+      )}
+
+      {!state?.drawn && (
+        <LiveDrawPanel
+          players={players}
+          slots={drawSlots}
+          status={drawStatus}
+          size={state?.draw_size ?? null}
+        />
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">

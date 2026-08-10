@@ -28,14 +28,9 @@ export function NavBar({ lang, nav, brand }: { lang: Lang; nav: Dict["nav"]; bra
 
   return (
     <>
-      {/* The bar is light-on-dark, so off the home page it carries its own navy
-          field — seamless over a PageShell masthead, and readable on any page
-          that has none (404). Home leaves it transparent over the hero video. */}
-      <header
-        className={`absolute inset-x-0 top-0 z-30 flex items-center justify-between px-4 py-4 sm:px-8 sm:py-5 ${
-          pathname === "/" ? "" : "bg-navy"
-        }`}
-      >
+      {/* Always an opaque navy field, light-on-dark, so it stays legible over
+          any content behind it (hero video, masthead, or bare page). */}
+      <header className="absolute inset-x-0 top-0 z-30 flex items-center justify-between bg-navy px-4 py-4 sm:px-8 sm:py-5">
         <Link href="/" className="flex items-center gap-2 text-base font-semibold text-white">
           <Image
             src="/klija.png"
@@ -80,24 +75,24 @@ export function NavBar({ lang, nav, brand }: { lang: Lang; nav: Dict["nav"]; bra
             {menuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
-      </header>
 
-      {menuOpen && (
-        <div className="liquid-glass-panel absolute inset-x-4 top-[72px] z-40 flex flex-col gap-1 rounded-2xl p-3 lg:hidden">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              onClick={() => setMenuOpen(false)}
-              className={`w-full rounded-xl px-4 py-3.5 text-sm transition-colors ${
-                isActive(l.href) ? "bg-fg/10 font-medium text-fg" : "text-fg/70"
-              }`}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </div>
-      )}
+        {menuOpen && (
+          <div className="liquid-glass-panel !absolute inset-x-4 top-full z-40 mt-2 flex flex-col gap-1 rounded-2xl p-3 lg:hidden">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                onClick={() => setMenuOpen(false)}
+                className={`w-full rounded-xl px-4 py-3.5 text-sm transition-colors [-webkit-tap-highlight-color:transparent] ${
+                  isActive(l.href) ? "bg-fg/10 font-medium text-fg" : "text-fg/70 active:bg-fg/10"
+                }`}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        )}
+      </header>
     </>
   );
 }

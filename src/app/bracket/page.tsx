@@ -1,16 +1,19 @@
-import { getJudgeMatch, getMatches, getPlayers } from "@/lib/data";
+import { getJudgeMatch, getMatches, getPlayers, getState } from "@/lib/data";
 import { BracketView } from "@/components/BracketView";
 import { MatchCard } from "@/components/MatchCard";
+import { OnAirBanner } from "@/components/OnAirBanner";
+import { LiveWatch } from "@/components/LiveWatch";
 import { EmptyState, PageShell } from "@/components/PageShell";
 import { getLang, getT } from "@/lib/i18n/server";
 
 export const revalidate = 0;
 
 export default async function BracketPage() {
-  const [matches, players, judgeMatch] = await Promise.all([
+  const [matches, players, judgeMatch, state] = await Promise.all([
     getMatches(),
     getPlayers(),
     getJudgeMatch(),
+    getState(),
   ]);
   const t = getT();
   const locale = getLang() === "ar" ? "ar-SA" : "en-GB";
@@ -18,7 +21,16 @@ export default async function BracketPage() {
   return (
     <PageShell title={t.bracket.title} subtitle={t.bracket.subtitle} badge={t.brand} wide>
       {matches.length === 0 ? (
-        <EmptyState>{t.bracket.empty}</EmptyState>
+        // No tree yet — but if the draw is on air, that's where everyone should
+        // be, and this page has to notice the moment it starts or finishes.
+        <>
+          {state?.draw_status === "live" ? (
+            <OnAirBanner title={t.draw.onAir} cta={t.draw.watch} />
+          ) : (
+            <EmptyState>{t.bracket.empty}</EmptyState>
+          )}
+          <LiveWatch tables={["tournament_state", "matches"]} />
+        </>
       ) : (
         <BracketView matches={matches} players={players} t={t} locale={locale} />
       )}

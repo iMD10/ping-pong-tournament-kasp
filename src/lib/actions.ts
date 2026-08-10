@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buildBracket, generateBracket, validatePairings, type DraftMatch, type Pairing } from "@/lib/bracket";
+import { drawSeatCount, seatArray, seatsToPairings } from "@/lib/draw";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
 import { validateDeciderScore, validateGameScore } from "@/lib/validation";
 import type { Game, Match, Round } from "@/lib/supabase/types";
@@ -108,6 +109,9 @@ export async function removePlayer(id: string): Promise<ActionResult> {
 // Draw
 // ---------------------------------------------------------------------------
 
+/** The instant and manual draws refuse to run underneath a live ceremony. */
+const LIVE_DRAW_BUSY = "فيه قرعة شغالة على الهواء. أنهها أو ألغها أول.";
+
 /** Writes a freshly built bracket and flips the tournament into "drawn". */
 async function persistDraft(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
@@ -152,8 +156,9 @@ async function persistDraft(
 
 export async function runDraw(): Promise<ActionResult> {
   const supabase = await requireAdmin();
-  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  const { data: state } = await supabase.from("tournament_state").select("drawn, draw_status").single();
   if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+  if (state?.draw_status === "live") return { ok: false, error: LIVE_DRAW_BUSY };
 
   const { data: players, error: pErr } = await supabase.from("players").select("id");
   if (pErr) return { ok: false, error: pErr.message };
@@ -165,8 +170,9 @@ export async function runDraw(): Promise<ActionResult> {
 /** Same as runDraw, but the admin decided every first-round pairing by hand. */
 export async function runManualDraw(pairings: Pairing[]): Promise<ActionResult> {
   const supabase = await requireAdmin();
-  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  const { data: state } = await supabase.from("tournament_state").select("drawn, draw_status").single();
   if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+  if (state?.draw_status === "live") return { ok: false, error: LIVE_DRAW_BUSY };
 
   const { data: players, error: pErr } = await supabase.from("players").select("id");
   if (pErr) return { ok: false, error: pErr.message };
@@ -181,7 +187,159 @@ export async function runManualDraw(pairings: Pairing[]): Promise<ActionResult> 
 export async function resetTournament(): Promise<ActionResult> {
   const supabase = await requireAdmin();
   await supabase.from("matches").delete().neq("round", "__never__");
-  await supabase.from("tournament_state").update({ drawn: false, champion_id: null }).eq("id", 1);
+  await supabase.from("draw_slots").delete().gte("seat", 0);
+  await supabase
+    .from("tournament_state")
+    .update({ drawn: false, champion_id: null, draw_status: "idle", draw_size: null })
+    .eq("id", 1);
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Live draw — «القرعة على الهواء»
+//
+// The draw happens in the room with paper slips. These actions only publish it
+// seat by seat so the crowd can follow along; no pairing is decided here. The
+// real bracket is built once, from the finished board, by finishLiveDraw.
+// ---------------------------------------------------------------------------
+
+export async function startLiveDraw(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+
+  const { data: players, error: pErr } = await supabase.from("players").select("id");
+  if (pErr) return { ok: false, error: pErr.message };
+  if (!players || players.length < 2) return { ok: false, error: "لازم لاعبين اثنين على الأقل" };
+
+  // A fresh board every time the ceremony opens.
+  await supabase.from("draw_slots").delete().gte("seat", 0);
+  const { error } = await supabase
+    .from("tournament_state")
+    .update({ draw_status: "live", draw_size: drawSeatCount(players.length) })
+    .eq("id", 1);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/**
+ * Puts one player into one seat, or empties it with a null player. Placing an
+ * already-placed player swaps the two seats, the same forgiving behaviour the
+ * manual arrangement panel has — the admin is typing this while a room waits.
+ */
+export async function setDrawSlot(seat: number, playerId: string | null): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase
+    .from("tournament_state")
+    .select("drawn, draw_status, draw_size")
+    .single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل" };
+  if (state?.draw_status !== "live") return { ok: false, error: "ابدأ القرعة أول" };
+
+  const size = state.draw_size ?? 0;
+  if (!Number.isInteger(seat) || seat < 0 || seat >= size) return { ok: false, error: "خانة مو موجودة" };
+
+  const { data: rows, error: readErr } = await supabase.from("draw_slots").select("*");
+  if (readErr) return { ok: false, error: readErr.message };
+  const board = rows ?? [];
+  const occupant = board.find((r) => r.seat === seat) ?? null;
+
+  if (playerId == null) {
+    if (occupant) {
+      const { error } = await supabase.from("draw_slots").delete().eq("seat", seat);
+      if (error) return { ok: false, error: error.message };
+    }
+    revalidatePath("/", "layout");
+    return { ok: true, data: null };
+  }
+
+  const existing = board.find((r) => r.player_id === playerId) ?? null;
+  if (existing?.seat === seat) return { ok: true, data: null };
+
+  const { data: player } = await supabase.from("players").select("id").eq("id", playerId).maybeSingle();
+  if (!player) return { ok: false, error: "اللاعب مو مسجّل بالقائمة" };
+
+  // player_id is unique, so both affected seats are cleared before either is
+  // rewritten — otherwise the new row collides with the player's old one.
+  const clearing = existing ? [seat, existing.seat] : [seat];
+  const { error: delErr } = await supabase.from("draw_slots").delete().in("seat", clearing);
+  if (delErr) return { ok: false, error: delErr.message };
+
+  const inserts = [{ seat, player_id: playerId }];
+  // Dropping a placed player onto an occupied seat trades their places.
+  if (existing && occupant) inserts.push({ seat: existing.seat, player_id: occupant.player_id });
+
+  const { error: insErr } = await supabase.from("draw_slots").insert(inserts);
+  if (insErr) return { ok: false, error: insErr.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/** Abandons the ceremony and wipes the board. The roster is untouched. */
+export async function cancelLiveDraw(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت، ما ينفع تلغيها" };
+
+  await supabase.from("draw_slots").delete().gte("seat", 0);
+  const { error } = await supabase
+    .from("tournament_state")
+    .update({ draw_status: "idle", draw_size: null })
+    .eq("id", 1);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/** Turns the finished board into the real bracket. */
+export async function finishLiveDraw(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase
+    .from("tournament_state")
+    .select("drawn, draw_status, draw_size")
+    .single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل" };
+  if (state?.draw_status !== "live") return { ok: false, error: "ما به قرعة شغالة" };
+  const size = state.draw_size ?? 0;
+
+  const [{ data: players, error: pErr }, { data: slots, error: sErr }] = await Promise.all([
+    supabase.from("players").select("id"),
+    supabase.from("draw_slots").select("*"),
+  ]);
+  if (pErr) return { ok: false, error: pErr.message };
+  if (sErr) return { ok: false, error: sErr.message };
+  if (!players || players.length < 2) return { ok: false, error: "لازم لاعبين اثنين على الأقل" };
+
+  // The grid was sized when the ceremony opened; a roster change since then
+  // means it no longer fits, and silently resizing it would move people around.
+  if (size !== drawSeatCount(players.length)) {
+    return { ok: false, error: "عدد اللاعبين تغيّر بعد ما بدأت القرعة. ألغِ القرعة وابدأها من جديد." };
+  }
+
+  const pairings = seatsToPairings(seatArray(slots ?? [], size));
+  const check = validatePairings(pairings, players.map((p) => p.id));
+  if (!check.valid) return { ok: false, error: check.error };
+
+  // Claiming the status first is the lock: a second click lands on a status
+  // that is no longer 'live' and bails out instead of building a second tree.
+  const { error: lockErr } = await supabase
+    .from("tournament_state")
+    .update({ draw_status: "done" })
+    .eq("id", 1)
+    .eq("draw_status", "live");
+  if (lockErr) return { ok: false, error: lockErr.message };
+
+  const res = await persistDraft(supabase, buildBracket(pairings));
+  if (!res.ok) {
+    await supabase.from("tournament_state").update({ draw_status: "live" }).eq("id", 1);
+    return res;
+  }
+
   revalidatePath("/", "layout");
   return { ok: true, data: null };
 }

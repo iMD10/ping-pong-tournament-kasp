@@ -1,5 +1,7 @@
 export type Round = "R1" | "R16" | "QF" | "SF" | "F" | "judge";
 export type OutcomeType = "pending" | "score" | "absent" | "withdrew" | "bye";
+/** idle = not started, live = papers being read out, done = bracket built. */
+export type DrawStatus = "idle" | "live" | "done";
 
 export interface Player {
   id: string;
@@ -40,7 +42,18 @@ export interface TournamentState {
   /** «أفضل شمات» — awarded by the admin, not computed from results. */
   best_shamat_name: string | null;
   best_shamat_quote: string | null;
+  draw_status: DrawStatus;
+  /** Seats in the live draw, frozen when it starts so a late roster change
+   * can't reshape the grid under the audience. Null until then. */
+  draw_size: number | null;
   updated_at: string;
+}
+
+/** One filled seat of the live draw. Seat i = match floor(i/2), side (i%2)+1. */
+export interface DrawSlot {
+  seat: number;
+  player_id: string;
+  created_at: string;
 }
 
 /** A quote from a player or spectator, typed in by the admin. */
@@ -74,6 +87,11 @@ export interface Database {
         Row: Statement;
         Insert: Partial<Statement> & { name: string; quote: string };
         Update: Partial<Statement>;
+      };
+      draw_slots: {
+        Row: DrawSlot;
+        Insert: { seat: number; player_id: string };
+        Update: Partial<DrawSlot>;
       };
     };
   };

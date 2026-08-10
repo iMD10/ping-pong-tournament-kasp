@@ -6,6 +6,7 @@ export const dict = {
     nav: {
       home: "الرئيسية",
       bracket: "مسار البطولة",
+      draw: "القرعة",
       players: "اللاعبون",
       rules: "القوانين",
       prize: "الجائزة",
@@ -40,12 +41,12 @@ export const dict = {
     },
     draw: {
       title: "القرعة على الهواء",
-      subtitle: "الأسماء تنسحب من الكيس وحدة وحدة، والمسار يتكوّن قدامك مباشرة.",
+      subtitle: "الأسماء تنسحب من التنكة وحدة وحدة، والمسار يتكوّن قدامك مباشرة.",
       onAir: "القرعة على الهواء الآن",
       watch: "تابع القرعة",
       notStarted: "القرعة ما بدأت بعد. ترقبونا.",
-      inBag: "باقي بالكيس",
-      bagEmpty: "الكيس فاضي",
+      inBag: "باقي بالتنكة",
+      bagEmpty: "التنكة فاضي",
       progress: "انسحب",
       of: "من",
       match: "مباراة",
@@ -123,6 +124,7 @@ export const dict = {
     nav: {
       home: "Home",
       bracket: "Bracket",
+      draw: "Draw",
       players: "Players",
       rules: "Rules",
       prize: "Prize",

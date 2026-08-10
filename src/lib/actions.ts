@@ -11,6 +11,7 @@ import {
   knockoutPairingsFromQualifiers,
   possibleGroupCounts,
   roundRobinPairs,
+  validateGroupSplit,
 } from "@/lib/groups";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
 import { validateDeciderScore, validateGameScore } from "@/lib/validation";
@@ -233,33 +234,25 @@ export async function resetTournament(): Promise<ActionResult> {
 // qualifiers walk into the round of 16, eight into the quarters, and so on.
 // ---------------------------------------------------------------------------
 
-/** Draws the roster into round-robin groups instead of a knockout tree. */
-export async function runGroupDraw(
-  groupCount: number,
-  advancePerGroup: number
-): Promise<ActionResult> {
-  const supabase = await requireAdmin();
+/** Shared tail of both group draws: the roster, then the fixtures. */
+async function readRosterForGroups(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>
+): Promise<ActionResult<string[]>> {
   const { data: state } = await supabase.from("tournament_state").select("drawn, draw_status").single();
   if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
   if (state?.draw_status === "live") return { ok: false, error: LIVE_DRAW_BUSY };
 
-  const { data: players, error: pErr } = await supabase.from("players").select("id");
-  if (pErr) return { ok: false, error: pErr.message };
-  const ids = (players ?? []).map((p) => p.id);
+  const { data: players, error } = await supabase.from("players").select("id");
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: (players ?? []).map((p) => p.id) };
+}
 
-  if (!possibleGroupCounts(ids.length).includes(groupCount)) {
-    return {
-      ok: false,
-      error: `ما ينفع ${groupCount} مجموعات لـ ${ids.length} لاعب. كل مجموعة لازم ${MIN_GROUP_SIZE} لاعبين على الأقل.`,
-    };
-  }
-
-  const groups = distributeIntoGroups(ids, groupCount);
-  const smallest = Math.min(...groups.map((g) => g.length));
-  if (!Number.isInteger(advancePerGroup) || advancePerGroup < 1 || advancePerGroup >= smallest) {
-    return { ok: false, error: `عدد المتأهلين لازم بين 1 و ${smallest - 1} من كل مجموعة` };
-  }
-
+/** Writes the round-robin fixtures for a validated split and opens the stage. */
+async function persistGroups(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  groups: string[][],
+  advancePerGroup: number
+): Promise<ActionResult> {
   const rows = groups.flatMap((members, groupNo) =>
     roundRobinPairs(members).map(([p1, p2]) => ({ groupNo, p1, p2 }))
   );
@@ -283,7 +276,7 @@ export async function runGroupDraw(
     .update({
       drawn: true,
       format: "groups",
-      group_count: groupCount,
+      group_count: groups.length,
       advance_per_group: advancePerGroup,
     })
     .eq("id", 1);
@@ -291,6 +284,45 @@ export async function runGroupDraw(
 
   revalidatePath("/", "layout");
   return { ok: true, data: null };
+}
+
+/** Draws the roster into round-robin groups instead of a knockout tree. */
+export async function runGroupDraw(
+  groupCount: number,
+  advancePerGroup: number
+): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const roster = await readRosterForGroups(supabase);
+  if (!roster.ok) return roster;
+  const ids = roster.data;
+
+  if (!possibleGroupCounts(ids.length).includes(groupCount)) {
+    return {
+      ok: false,
+      error: `ما ينفع ${groupCount} مجموعات لـ ${ids.length} لاعب. كل مجموعة لازم ${MIN_GROUP_SIZE} لاعبين على الأقل.`,
+    };
+  }
+
+  const groups = distributeIntoGroups(ids, groupCount);
+  const check = validateGroupSplit(groups, ids, advancePerGroup);
+  if (!check.valid) return { ok: false, error: check.error };
+
+  return persistGroups(supabase, groups, advancePerGroup);
+}
+
+/** Same as runGroupDraw, but the admin filled every group by hand. */
+export async function runManualGroupDraw(
+  groups: string[][],
+  advancePerGroup: number
+): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const roster = await readRosterForGroups(supabase);
+  if (!roster.ok) return roster;
+
+  const check = validateGroupSplit(groups, roster.data, advancePerGroup);
+  if (!check.valid) return { ok: false, error: check.error };
+
+  return persistGroups(supabase, groups, advancePerGroup);
 }
 
 /**

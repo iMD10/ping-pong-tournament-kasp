@@ -42,6 +42,40 @@ export function distributeIntoGroups(playerIds: string[], groupCount: number): s
 }
 
 /**
+ * Checks that a hand-made split is a legal group stage for `playerIds`: enough
+ * groups, nobody missing or doubled up, every group big enough to be a group,
+ * and at least one player in each of them going home.
+ */
+export function validateGroupSplit(
+  groups: string[][],
+  playerIds: string[],
+  advancePerGroup: number
+): { valid: true } | { valid: false; error: string } {
+  if (groups.length < 2) return { valid: false, error: "لازم مجموعتين على الأقل" };
+
+  const smallest = Math.min(...groups.map((g) => g.length));
+  if (smallest < MIN_GROUP_SIZE) {
+    return { valid: false, error: `كل مجموعة لازم ${MIN_GROUP_SIZE} لاعبين على الأقل` };
+  }
+  if (!Number.isInteger(advancePerGroup) || advancePerGroup < 1 || advancePerGroup >= smallest) {
+    return { valid: false, error: `عدد المتأهلين لازم بين 1 و ${smallest - 1} من كل مجموعة` };
+  }
+
+  const roster = new Set(playerIds);
+  const seen = new Set<string>();
+  for (const id of groups.flat()) {
+    if (!roster.has(id)) return { valid: false, error: "فيه لاعب مو مسجّل بالقائمة" };
+    if (seen.has(id)) return { valid: false, error: "فيه لاعب محطوط بأكثر من مجموعة" };
+    seen.add(id);
+  }
+  if (seen.size !== playerIds.length) {
+    return { valid: false, error: `باقي ${playerIds.length - seen.size} لاعب بدون مجموعة` };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Every pairing inside a group, ordered by the circle method so each matchday
  * has every player on a table at once instead of one player playing back to
  * back. An odd group sits one player out each round.

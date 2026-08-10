@@ -55,6 +55,8 @@ the login screen behind it is the second layer of protection.
 - `src/lib/groups.ts` — group draw, round-robin fixtures, standings, and the
   seeding that turns qualifiers into a knockout tree.
 - `src/lib/match.ts` — best-of-3 final logic, «ما لك كليجا» detection.
+- `src/lib/time.ts` — the tournament clock: every match time is written and read
+  in `Asia/Riyadh`, whatever zone the device or the server happens to be in.
 - `src/lib/actions.ts` — all admin server actions (draw, scoring, edit/recompute, reset).
 - `src/lib/jokes.ts` — bilingual joke pool for kleeja easter eggs (append lines here).
 - `src/app/(public pages)` — Home, Bracket (tree/list), Players, Rules, Prize, Hall of Fame/Shame.
@@ -79,7 +81,23 @@ The admin picks one before the draw, on `/admin`:
 The knockout tree is built once, from the tables as they stand at that moment,
 so results are worth checking before pressing the button.
 
-## 7. Still open (see original spec)
+## 7. Fixing a match after the fact
+
+Every match card on `/admin` has **امسح النتيجة**, which puts the match back to
+"not played yet" — for a score typed against a match that never happened, a
+walkover called too early, or a wrong first game of a best-of-three. Before it
+wipes anything it lists the later matches that were built on that winner, since
+those are voided along with it (and a voided final un-crowns the champion). A
+bye is the one thing it won't touch: that follows from who is placed in the
+match, so it is undone in **غيّر اللاعبين**.
+
+Match times are stored as UTC but always entered and displayed on the
+tournament's own clock (`Asia/Riyadh`, see `src/lib/time.ts`). 4:30 م typed in
+the admin picker is 4:30 م on every phone in the hall and on the server-rendered
+homepage. Move the tournament to another city and that one constant is the only
+thing to change.
+
+## 8. Still open (see original spec)
 
 - Real funders / prize copy for 2nd & 3rd place.
 - Event date for the homepage countdown (wire into `tournament_state.event_date`).

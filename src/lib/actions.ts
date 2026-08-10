@@ -748,8 +748,9 @@ export async function recordWalkover(
 // ---------------------------------------------------------------------------
 
 /** Walks the next_match chain from `matchId` collecting every match that
- * currently depends on its winner, so the UI can warn before voiding them. */
-export async function previewEditImpact(matchId: string, newWinnerId: string): Promise<
+ * currently depends on its winner, so the UI can warn before voiding them.
+ * A null `newWinnerId` asks the same question for wiping the result entirely. */
+export async function previewEditImpact(matchId: string, newWinnerId: string | null): Promise<
   ActionResult<{ sameWinner: boolean; affected: { id: string; round: string }[] }>
 > {
   const supabase = await requireAdmin();
@@ -773,6 +774,48 @@ export async function previewEditImpact(matchId: string, newWinnerId: string): P
   return { ok: true, data: { sameWinner: false, affected } };
 }
 
+/**
+ * Voids every match down the chain from `match`, because its winner is no
+ * longer the one those matches were played on. The match immediately after it
+ * keeps whatever propagateWinner just seated there; deeper rounds only ever
+ * held the old winner by way of that first match, so their slot goes back to
+ * TBD. A voided final also un-crowns the champion.
+ */
+async function voidDownstream(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  match: Match,
+  oldWinnerId: string | null
+) {
+  let cursor = match.next_match_id;
+  let firstHop = true;
+  while (cursor) {
+    const { data: next } = await supabase.from("matches").select("*").eq("id", cursor).single();
+    if (!next) break;
+    const nextCursor = next.next_match_id;
+    const keepSlot = (id: string | null) => (firstHop || !oldWinnerId || id !== oldWinnerId ? id : null);
+
+    await supabase
+      .from("matches")
+      .update({
+        games: [],
+        winner_id: null,
+        outcome_type: "pending",
+        outcome_reason: null,
+        is_live: false,
+        player1_id: keepSlot(next.player1_id),
+        player2_id: keepSlot(next.player2_id),
+      })
+      .eq("id", next.id);
+
+    if (next.round === "F") {
+      await supabase.from("tournament_state").update({ champion_id: null }).eq("id", 1);
+    }
+
+    cursor = nextCursor;
+    firstHop = false;
+  }
+}
+
 /** Applies an edited result. If the winner changed, voids every downstream
  * match that depended on the old winner (never silently, call previewEditImpact first). */
 export async function editResult(
@@ -792,30 +835,63 @@ export async function editResult(
     .eq("id", matchId);
   if (updErr) return { ok: false, error: updErr.message };
 
-  if (winnerId) await propagateWinner(supabase, match as Match, winnerId);
+  // Re-seat the next round first — including with a null, when the edit left
+  // the match undecided — so voidDownstream reads a slot that is already right.
+  if (winnerId || winnerChanged) await propagateWinner(supabase, match as Match, winnerId);
 
   if (winnerChanged) {
-    // Void every downstream match that depended on the previous result.
-    let cursor = match.next_match_id;
-    while (cursor) {
-      const { data: next } = await supabase.from("matches").select("*").eq("id", cursor).single();
-      if (!next) break;
-      const nextCursor = next.next_match_id;
-      await supabase
-        .from("matches")
-        .update({
-          games: [],
-          winner_id: null,
-          outcome_type: "pending",
-          outcome_reason: null,
-          // Clear whichever slot the voided winner used to occupy so the
-          // bracket shows TBD again instead of a stale name.
-          player1_id: next.player1_id === match.winner_id ? (winnerId ?? null) : next.player1_id,
-          player2_id: next.player2_id === match.winner_id ? (winnerId ?? null) : next.player2_id,
-        })
-        .eq("id", next.id);
-      cursor = nextCursor;
+    await voidDownstream(supabase, match as Match, match.winner_id);
+    if (match.round === "F") {
+      await supabase.from("tournament_state").update({ champion_id: winnerId }).eq("id", 1);
     }
+  }
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/**
+ * Wipes a match back to "not played yet" — the escape hatch for a score typed
+ * against a match that never happened, a walkover called too early, or a first
+ * game of a best-of-three that went in wrong. Everything the old winner went on
+ * to reach is voided with it, so the admin sees the damage first via
+ * previewEditImpact.
+ */
+export async function clearResult(matchId: string): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (error || !match) return { ok: false, error: "المباراة ما فيه لها وجود" };
+
+  // A bye isn't a result anybody typed; it follows from who is placed in the
+  // match, so it's undone by moving players, not by clearing a score.
+  if (match.outcome_type === "bye") {
+    return { ok: false, error: "الاستراحة تتغيّر من اللاعبين، مو من النتيجة" };
+  }
+  if ((match.games as Game[]).length === 0 && match.outcome_type === "pending") {
+    return { ok: false, error: "ما فيه نتيجة تنمسح" };
+  }
+
+  const oldWinnerId = match.winner_id;
+
+  const { error: updErr } = await supabase
+    .from("matches")
+    .update({
+      games: [] as Game[],
+      winner_id: null,
+      outcome_type: "pending",
+      outcome_reason: null,
+      is_live: false,
+    })
+    .eq("id", matchId);
+  if (updErr) return { ok: false, error: updErr.message };
+
+  if (oldWinnerId) {
+    // Pull the old winner back out of the next round, then void the rest.
+    await propagateWinner(supabase, match as Match, null);
+    await voidDownstream(supabase, match as Match, oldWinnerId);
+  }
+  if (match.round === "F") {
+    await supabase.from("tournament_state").update({ champion_id: null }).eq("id", 1);
   }
 
   revalidatePath("/", "layout");

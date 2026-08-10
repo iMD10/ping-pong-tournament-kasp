@@ -50,13 +50,34 @@ the login screen behind it is the second layer of protection.
 - `supabase/schema.sql` — full DB schema, RLS policies, realtime publication.
 - `src/lib/validation.ts` — the scoring rulebook (11-x, 7-0 mercy, 10-10 decider).
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
+- `src/lib/groups.ts` — group draw, round-robin fixtures, standings, and the
+  seeding that turns qualifiers into a knockout tree.
 - `src/lib/match.ts` — best-of-3 final logic, «ما لك كليجا» detection.
 - `src/lib/actions.ts` — all admin server actions (draw, scoring, edit/recompute, reset).
 - `src/lib/jokes.ts` — bilingual joke pool for kleeja easter eggs (append lines here).
 - `src/app/(public pages)` — Home, Bracket (tree/list), Players, Rules, Prize, Hall of Fame/Shame.
 - `src/app/admin` — hidden admin dashboard.
 
-## 6. Still open (see original spec)
+## 6. Tournament formats
+
+The admin picks one before the draw, on `/admin`:
+
+- **خروج مباشر (knockout)** — the original single-elimination tree, drawn at
+  random, by hand, or live on air.
+- **مجموعات (groups)** — the roster is dealt into round-robin groups (at least
+  3 players each) and everyone plays everyone in their group once. Tables are
+  ranked on **wins and losses alone**; a tie is broken by point difference and
+  then by points scored. When every group match has a result, one button seeds
+  the top *n* of each group into a knockout tree — 16 qualifiers walk into the
+  round of 16, 8 into the quarters, and so on. The seeding keeps two players
+  from the same group out of each other's first match, and with two qualifying
+  from an even number of groups a winner and their own runner-up can only meet
+  in the final.
+
+The knockout tree is built once, from the tables as they stand at that moment,
+so results are worth checking before pressing the button.
+
+## 7. Still open (see original spec)
 
 - Real funders / prize copy for 2nd & 3rd place.
 - Event date for the homepage countdown (wire into `tournament_state.event_date`).

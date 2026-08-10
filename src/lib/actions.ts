@@ -4,6 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buildBracket, generateBracket, validatePairings, type DraftMatch, type Pairing } from "@/lib/bracket";
 import { drawSeatCount, seatArray, seatsToPairings } from "@/lib/draw";
+import {
+  MIN_GROUP_SIZE,
+  distributeIntoGroups,
+  groupsFromMatches,
+  knockoutPairingsFromQualifiers,
+  possibleGroupCounts,
+  roundRobinPairs,
+} from "@/lib/groups";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
 import { validateDeciderScore, validateGameScore } from "@/lib/validation";
 import type { Game, Match, Round } from "@/lib/supabase/types";
@@ -112,8 +120,8 @@ export async function removePlayer(id: string): Promise<ActionResult> {
 /** The instant and manual draws refuse to run underneath a live ceremony. */
 const LIVE_DRAW_BUSY = "فيه قرعة شغالة على الهواء. أنهها أو ألغها أول.";
 
-/** Writes a freshly built bracket and flips the tournament into "drawn". */
-async function persistDraft(
+/** Writes a freshly built bracket: the match rows, then their next-match links. */
+async function insertBracket(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
   draft: DraftMatch[]
 ): Promise<ActionResult> {
@@ -148,7 +156,19 @@ async function persistDraft(
     if (error) return { ok: false, error: error.message };
   }
 
-  await supabase.from("tournament_state").update({ drawn: true }).eq("id", 1);
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/** Writes a freshly built bracket and flips the tournament into "drawn". */
+async function persistDraft(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  draft: DraftMatch[]
+): Promise<ActionResult> {
+  const res = await insertBracket(supabase, draft);
+  if (!res.ok) return res;
+
+  await supabase.from("tournament_state").update({ drawn: true, format: "knockout" }).eq("id", 1);
 
   revalidatePath("/", "layout");
   return { ok: true, data: null };
@@ -190,10 +210,122 @@ export async function resetTournament(): Promise<ActionResult> {
   await supabase.from("draw_slots").delete().gte("seat", 0);
   await supabase
     .from("tournament_state")
-    .update({ drawn: false, champion_id: null, draw_status: "idle", draw_size: null })
+    .update({
+      drawn: false,
+      champion_id: null,
+      draw_status: "idle",
+      draw_size: null,
+      format: "knockout",
+      group_count: null,
+      advance_per_group: null,
+    })
     .eq("id", 1);
   revalidatePath("/", "layout");
   return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Group stage — «دور المجموعات»
+//
+// The roster is dealt into groups that each play a full round robin. Ranking is
+// wins, and points only break a tie. When every group has finished, the top
+// `advance_per_group` of each one are seeded into a knockout tree — sixteen
+// qualifiers walk into the round of 16, eight into the quarters, and so on.
+// ---------------------------------------------------------------------------
+
+/** Draws the roster into round-robin groups instead of a knockout tree. */
+export async function runGroupDraw(
+  groupCount: number,
+  advancePerGroup: number
+): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn, draw_status").single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+  if (state?.draw_status === "live") return { ok: false, error: LIVE_DRAW_BUSY };
+
+  const { data: players, error: pErr } = await supabase.from("players").select("id");
+  if (pErr) return { ok: false, error: pErr.message };
+  const ids = (players ?? []).map((p) => p.id);
+
+  if (!possibleGroupCounts(ids.length).includes(groupCount)) {
+    return {
+      ok: false,
+      error: `ما ينفع ${groupCount} مجموعات لـ ${ids.length} لاعب. كل مجموعة لازم ${MIN_GROUP_SIZE} لاعبين على الأقل.`,
+    };
+  }
+
+  const groups = distributeIntoGroups(ids, groupCount);
+  const smallest = Math.min(...groups.map((g) => g.length));
+  if (!Number.isInteger(advancePerGroup) || advancePerGroup < 1 || advancePerGroup >= smallest) {
+    return { ok: false, error: `عدد المتأهلين لازم بين 1 و ${smallest - 1} من كل مجموعة` };
+  }
+
+  const rows = groups.flatMap((members, groupNo) =>
+    roundRobinPairs(members).map(([p1, p2]) => ({ groupNo, p1, p2 }))
+  );
+  if (rows.length === 0) return { ok: false, error: "ما طلعت أي مباراة من هذي القسمة" };
+
+  const { error: insErr } = await supabase.from("matches").insert(
+    rows.map((r, i) => ({
+      round: "G" as const,
+      group_no: r.groupNo,
+      bracket_slot: i,
+      player1_id: r.p1,
+      player2_id: r.p2,
+      outcome_type: "pending" as const,
+      games: [] as Game[],
+    }))
+  );
+  if (insErr) return { ok: false, error: insErr.message };
+
+  const { error: stateErr } = await supabase
+    .from("tournament_state")
+    .update({
+      drawn: true,
+      format: "groups",
+      group_count: groupCount,
+      advance_per_group: advancePerGroup,
+    })
+    .eq("id", 1);
+  if (stateErr) return { ok: false, error: stateErr.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/**
+ * Closes the group stage and builds the knockout tree from the qualifiers.
+ * Refuses while any group match is still open — a half-finished table would
+ * seed the wrong people, and the tree can't be redrawn once it exists.
+ */
+export async function buildKnockoutFromGroups(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase
+    .from("tournament_state")
+    .select("drawn, format, advance_per_group")
+    .single();
+  if (!state?.drawn || state.format !== "groups") return { ok: false, error: "ما به دور مجموعات" };
+
+  const { data: matches, error: mErr } = await supabase.from("matches").select("*").neq("round", "judge");
+  if (mErr) return { ok: false, error: mErr.message };
+
+  const all = (matches ?? []) as Match[];
+  if (all.some((m) => m.round !== "G")) {
+    return { ok: false, error: "الأدوار الإقصائية انبنت من قبل" };
+  }
+
+  const groups = groupsFromMatches(all);
+  if (groups.length === 0) return { ok: false, error: "ما به مباريات مجموعات" };
+
+  const pending = groups.reduce((sum, g) => sum + (g.total - g.played), 0);
+  if (pending > 0) return { ok: false, error: `باقي ${pending} مباراة بدور المجموعات` };
+
+  const advance = state.advance_per_group ?? 2;
+  const qualifiers = groups.map((g) => g.standings.slice(0, advance).map((s) => s.playerId));
+  const total = qualifiers.reduce((sum, q) => sum + q.length, 0);
+  if (total < 2) return { ok: false, error: "لازم متأهلين اثنين على الأقل" };
+
+  return insertBracket(supabase, buildBracket(knockoutPairingsFromQualifiers(qualifiers)));
 }
 
 // ---------------------------------------------------------------------------
@@ -394,21 +526,27 @@ export async function setMatchPlayers(
     return { ok: false, error: "ما ينفع نفس اللاعب بالطرفين" };
   }
 
-  // A player can only appear once per round.
-  const { data: siblings } = await supabase
-    .from("matches")
-    .select("id, player1_id, player2_id")
-    .eq("round", match.round)
-    .neq("id", matchId);
-  const clash = [player1Id, player2Id].find(
-    (id) => id && siblings?.some((s) => s.player1_id === id || s.player2_id === id)
-  );
-  if (clash) return { ok: false, error: "اللاعب محطوط بمباراة ثانية بنفس الدور" };
+  // A player can only appear once per knockout round. The group stage is the
+  // exception: a round robin is nothing but the same names over and over.
+  if (match.round !== "G") {
+    const { data: siblings } = await supabase
+      .from("matches")
+      .select("id, player1_id, player2_id")
+      .eq("round", match.round)
+      .neq("id", matchId);
+    const clash = [player1Id, player2Id].find(
+      (id) => id && siblings?.some((s) => s.player1_id === id || s.player2_id === id)
+    );
+    if (clash) return { ok: false, error: "اللاعب محطوط بمباراة ثانية بنفس الدور" };
+  }
 
   // One player alone is a bye only when nothing can ever fill the other slot.
+  // A group match has no feeders at all, but it is still a fixture, not a bye.
   const lone = player1Id && !player2Id ? player1Id : !player1Id && player2Id ? player2Id : null;
   const winnerId =
-    lone && (await slotIsOrphaned(supabase, matchId, player1Id ? 2 : 1)) ? lone : null;
+    match.round !== "G" && lone && (await slotIsOrphaned(supabase, matchId, player1Id ? 2 : 1))
+      ? lone
+      : null;
 
   // Changing who advances would poison an already-played next match.
   if (winnerId !== match.winner_id && match.next_match_id) {

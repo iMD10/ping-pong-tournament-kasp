@@ -32,7 +32,13 @@ export default async function BracketPage() {
           <LiveWatch tables={["tournament_state", "matches"]} />
         </>
       ) : (
-        <BracketView matches={matches} players={players} t={t} locale={locale} />
+        <BracketView
+          matches={matches}
+          players={players}
+          advancePerGroup={state?.advance_per_group ?? 2}
+          t={t}
+          locale={locale}
+        />
       )}
 
       {/* The champion-vs-referee exhibition lives outside the tree, so it gets

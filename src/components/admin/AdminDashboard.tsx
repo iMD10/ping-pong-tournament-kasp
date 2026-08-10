@@ -7,14 +7,22 @@ import { PlayerManager } from "@/components/admin/PlayerManager";
 import { DrawPanel } from "@/components/admin/DrawPanel";
 import { ManualDrawPanel } from "@/components/admin/ManualDrawPanel";
 import { LiveDrawPanel } from "@/components/admin/LiveDrawPanel";
+import { GroupsPanel } from "@/components/admin/GroupsPanel";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
 import { JudgeMatchPanel } from "@/components/admin/JudgeMatchPanel";
 import { ShamatPanel } from "@/components/admin/ShamatPanel";
 import { StatementsPanel } from "@/components/admin/StatementsPanel";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
-import type { DrawSlot, Match, Player, Statement, TournamentState } from "@/lib/supabase/types";
+import type {
+  DrawSlot,
+  Match,
+  Player,
+  Statement,
+  TournamentFormat,
+  TournamentState,
+} from "@/lib/supabase/types";
 
-const ROUND_RANK: Record<string, number> = { R1: 0, R16: 1, QF: 2, SF: 3, F: 4, judge: 5 };
+const ROUND_RANK: Record<string, number> = { G: -1, R1: 0, R16: 1, QF: 2, SF: 3, F: 4, judge: 5 };
 
 export function AdminDashboard({
   players,
@@ -35,6 +43,13 @@ export function AdminDashboard({
   const [manualOpen, setManualOpen] = useState(false);
   const drawStatus = state?.draw_status ?? "idle";
   const liveDrawRunning = drawStatus === "live";
+
+  // Before the draw this is the admin's pick; after it, it's what was drawn.
+  const savedFormat = state?.format ?? "knockout";
+  const [pickedFormat, setPickedFormat] = useState<TournamentFormat>(savedFormat);
+  const format = state?.drawn ? savedFormat : pickedFormat;
+  const groupsFormat = format === "groups";
+  const knockoutStarted = matches.some((m) => m.round !== "G");
 
   const sorted = [...matches].sort(
     (a, b) => (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot
@@ -61,23 +76,36 @@ export function AdminDashboard({
         <DrawPanel
           drawn={!!state?.drawn}
           playerCount={players.length}
+          format={format}
+          onFormatChange={setPickedFormat}
           manualOpen={manualOpen}
           onToggleManual={() => setManualOpen((v) => !v)}
           liveDrawRunning={liveDrawRunning}
         />
       </div>
 
-      {!state?.drawn && !liveDrawRunning && manualOpen && players.length >= 2 && (
+      {!state?.drawn && !groupsFormat && !liveDrawRunning && manualOpen && players.length >= 2 && (
         // Remount when the roster size changes so the slot grid matches it.
         <ManualDrawPanel key={players.length} players={players} onClose={() => setManualOpen(false)} />
       )}
 
-      {!state?.drawn && (
+      {/* The on-air ceremony seats a knockout tree, so it stands down while the
+          groups format is selected — unless one is already running. */}
+      {!state?.drawn && (!groupsFormat || liveDrawRunning) && (
         <LiveDrawPanel
           players={players}
           slots={drawSlots}
           status={drawStatus}
           size={state?.draw_size ?? null}
+        />
+      )}
+
+      {state?.drawn && groupsFormat && (
+        <GroupsPanel
+          matches={matches}
+          players={players}
+          advancePerGroup={state.advance_per_group ?? 2}
+          knockoutStarted={knockoutStarted}
         />
       )}
 

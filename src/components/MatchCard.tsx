@@ -3,6 +3,7 @@ import type { Game, Match, Player } from "@/lib/supabase/types";
 import { groupLabel } from "@/lib/groups";
 import { matchHasMalKKleeja } from "@/lib/match";
 import { playerName } from "@/lib/players";
+import { formatMatchTime } from "@/lib/time";
 import type { Dict } from "@/lib/i18n/dictionary";
 import { KleejaIcon } from "@/components/KleejaIcon";
 
@@ -103,10 +104,7 @@ export function MatchCard({
           match.scheduled_at &&
           !finished && (
             <span className="shrink-0 tracking-normal">
-              {new Date(match.scheduled_at).toLocaleString(locale, {
-                dateStyle: "short",
-                timeStyle: "short",
-              })}
+              {formatMatchTime(match.scheduled_at, locale)}
             </span>
           )
         )}

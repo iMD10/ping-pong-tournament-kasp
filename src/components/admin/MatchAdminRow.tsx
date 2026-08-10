@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Radio, Pencil, CalendarClock, UserX, Users } from "lucide-react";
+import { Radio, Pencil, CalendarClock, UserX, Users, RotateCcw, X } from "lucide-react";
 import type { Match, Player } from "@/lib/supabase/types";
 import { groupLabel } from "@/lib/groups";
 import { formatScoreLine, gameWinCounts, gamesToWin, ROUND_LABELS_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
+import { formatMatchTime, scheduleInputToISO, toScheduleInputValue } from "@/lib/time";
 import {
+  clearResult,
   editResult,
   previewEditImpact,
   recordGameResult,
@@ -26,7 +28,7 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"idle" | "score" | "edit" | "walkover" | "players">("idle");
+  const [mode, setMode] = useState<"idle" | "score" | "edit" | "walkover" | "players" | "reset">("idle");
 
   const [s1, setS1] = useState("");
   const [s2, setS2] = useState("");
@@ -39,14 +41,28 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
   const [walkoverReason, setWalkoverReason] = useState("");
 
   const [editWarning, setEditWarning] = useState<{ id: string; round: string }[] | null>(null);
+  const [resetImpact, setResetImpact] = useState<{ id: string; round: string }[]>([]);
 
   const [slot1, setSlot1] = useState(match.player1_id ?? "");
   const [slot2, setSlot2] = useState(match.player2_id ?? "");
+
+  // The picker holds its own copy so a half-typed date survives the keystrokes,
+  // and re-syncs whenever the saved one changes underneath it.
+  const [scheduleValue, setScheduleValue] = useState(() => toScheduleInputValue(match.scheduled_at));
+  useEffect(() => {
+    setScheduleValue(toScheduleInputValue(match.scheduled_at));
+  }, [match.scheduled_at]);
 
   const p1Name = playerName(players, match.player1_id);
   const p2Name = playerName(players, match.player2_id);
   const canScore = !!(match.player1_id && match.player2_id) && !match.winner_id && match.outcome_type === "pending";
   const canEdit = !!match.winner_id && match.outcome_type === "score";
+  // Anything the admin typed can be taken back: a finished score, a half-played
+  // best-of-three, or a walkover called too early. A bye is not typed, it
+  // follows from the placement, so it is undone over in the players editor.
+  const canReset =
+    match.games.length > 0 || match.outcome_type === "absent" || match.outcome_type === "withdrew";
+  const canSchedule = !match.winner_id && match.outcome_type === "pending";
   // Players can be rearranged only while the match has no result of its own.
   const canAssign =
     match.round !== "judge" &&
@@ -150,6 +166,33 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
     });
   };
 
+  /** Asks what a wipe would cost before showing the confirm box. */
+  const openReset = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await previewEditImpact(match.id, null);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setResetImpact(res.data.affected);
+      setMode("reset");
+    });
+  };
+
+  const submitReset = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await clearResult(match.id);
+      if (!res.ok) setError(res.error);
+      else {
+        setResetImpact([]);
+        resetForm();
+        router.refresh();
+      }
+    });
+  };
+
   const toggleLive = () => {
     startTransition(async () => {
       await setLive(match.id, !match.is_live);
@@ -157,9 +200,10 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
     });
   };
 
+  // The box speaks tournament time, so 4:30 م is saved as 4:30 م in the hall.
   const updateSchedule = (value: string) => {
     startTransition(async () => {
-      await setSchedule(match.id, value ? new Date(value).toISOString() : null);
+      await setSchedule(match.id, value ? scheduleInputToISO(value) : null);
       router.refresh();
     });
   };
@@ -219,13 +263,13 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
 
       {match.scheduled_at && (
         <p className="mt-2 text-center text-[12px] text-fg/70">
-          {new Date(match.scheduled_at).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" })}
+          {formatMatchTime(match.scheduled_at, "ar-SA")}
         </p>
       )}
 
       {error && <p className="mt-2.5 text-xs text-live">{error}</p>}
 
-      {mode === "idle" && (canScore || canEdit || canAssign) && (
+      {mode === "idle" && (canScore || canEdit || canAssign || canReset || canSchedule) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {canScore && (
             <button
@@ -260,6 +304,16 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
               عدّل
             </button>
           )}
+          {canReset && (
+            <button
+              onClick={openReset}
+              disabled={pending}
+              className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-fg/70 hover:text-fg disabled:opacity-40"
+            >
+              <RotateCcw size={13} />
+              امسح النتيجة
+            </button>
+          )}
           {canAssign && (
             <button
               onClick={() => {
@@ -273,16 +327,71 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
               {match.player1_id && match.player2_id ? "غيّر اللاعبين" : "حط لاعبين"}
             </button>
           )}
-          {canScore && (
+          {canSchedule && (
             <label className="liquid-glass flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-2 text-xs text-fg/70">
               <CalendarClock size={13} />
               <input
                 type="datetime-local"
-                onChange={(e) => updateSchedule(e.target.value)}
-                className="w-[130px] bg-transparent text-xs text-fg/70 outline-none [color-scheme:dark]"
+                value={scheduleValue}
+                onChange={(e) => {
+                  // Half-typed dates read back as "", so only a finished one is
+                  // saved. Wiping the date is the × button's job.
+                  setScheduleValue(e.target.value);
+                  if (e.target.value) updateSchedule(e.target.value);
+                }}
+                className="w-[150px] bg-transparent text-xs text-fg/70 outline-none [color-scheme:dark]"
               />
+              {scheduleValue && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScheduleValue("");
+                    updateSchedule("");
+                  }}
+                  aria-label="امسح الموعد"
+                  className="text-fg/55 hover:text-fg"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </label>
           )}
+        </div>
+      )}
+
+      {mode === "reset" && (
+        <div className="mt-3 flex flex-col gap-2.5 rounded-xl bg-fg/[0.05] p-3.5">
+          <p className="text-xs leading-relaxed text-fg/80">
+            بترجع المباراة كأنها ما انلعبت، وتنمسح كل النتايج المسجّلة فيها.
+          </p>
+          {resetImpact.length > 0 && (
+            <div className="rounded-lg bg-live/10 p-3 text-xs text-live">
+              <p className="font-semibold">وبتلغي معها نتايج:</p>
+              <ul className="mt-1 list-inside list-disc text-live/80">
+                {resetImpact.map((a) => (
+                  <li key={a.id}>{ROUND_LABELS_AR[a.round as keyof typeof ROUND_LABELS_AR] ?? a.round}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              disabled={pending}
+              onClick={submitReset}
+              className="rounded-full bg-live px-4 py-2 text-xs font-medium text-bg disabled:opacity-40"
+            >
+              أكيد، امسحها
+            </button>
+            <button
+              onClick={() => {
+                setResetImpact([]);
+                setMode("idle");
+              }}
+              className="rounded-full bg-fg/10 px-4 py-2 text-xs text-fg/70"
+            >
+              إلغاء
+            </button>
+          </div>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Arabic } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
+import { Analytics } from "@vercel/analytics/next";
 import { NavBar } from "@/components/NavBar";
 import { Footer } from "@/components/Footer";
 import { dirFor, getLang, getT } from "@/lib/i18n/server";
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <NavBar lang={lang} nav={t.nav} brand={t.brand} />
         {children}
         <Footer footer={t.footer} brand={t.brand} />
+        <Analytics />
       </body>
     </html>
   );

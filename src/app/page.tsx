@@ -1,5 +1,6 @@
-import { getMatches, getPlayers, getState, playerName } from "@/lib/data";
+import { getJudgeMatch, getMatches, getPlayers, getState, getStatements, playerName } from "@/lib/data";
 import { MatchCard } from "@/components/MatchCard";
+import { StatementsTicker } from "@/components/StatementsTicker";
 import { HeroMedia } from "@/components/HeroMedia";
 import { KleejaIcon } from "@/components/KleejaIcon";
 import { HeroBadge } from "@/components/HeroBadge";
@@ -11,12 +12,19 @@ import { getLang, getT } from "@/lib/i18n/server";
 export const revalidate = 0;
 
 export default async function HomePage() {
-  const [matches, players, state] = await Promise.all([getMatches(), getPlayers(), getState()]);
+  const [matches, players, state, judgeMatch, statements] = await Promise.all([
+    getMatches(),
+    getPlayers(),
+    getState(),
+    getJudgeMatch(),
+    getStatements(),
+  ]);
   const t = getT();
   const lang = getLang();
   const locale = lang === "ar" ? "ar-SA" : "en-GB";
 
-  const live = matches.find((m) => m.is_live);
+  // The exhibition isn't in `matches`, but it still deserves the live banner.
+  const live = matches.find((m) => m.is_live) ?? (judgeMatch?.is_live ? judgeMatch : null);
   const upcoming = matches
     .filter((m) => !m.is_live && !m.winner_id && m.outcome_type === "pending" && m.player1_id && m.player2_id)
     .sort((a, b) => {
@@ -34,18 +42,19 @@ export default async function HomePage() {
       <section className="relative flex min-h-[100svh] w-full flex-col justify-center overflow-hidden">
         <HeroMedia />
         <div className="absolute inset-0 z-10 bg-gradient-to-t from-navy/95 via-navy/55 to-navy/65" />
-        <img
-          src="/klija.png"
-          alt=""
-          aria-hidden="true"
-          className="pointer-events-none absolute right-5 top-24 z-10 h-28 w-28 rotate-[14deg] object-contain opacity-10 sm:right-10 sm:h-44 sm:w-44"
-        />
 
-        <div className="relative z-20 flex w-full flex-col items-center px-6 py-24 text-center">
-          <HeroBadge
+        {/* Extra bottom padding only while the ticker is in the flow (below lg)
+            and only when it has something to show, so the centred stack lifts
+            clear of the players card pinned to the bottom corner. */}
+        <div
+          className={`relative z-20 flex w-full flex-col items-center px-6 pt-24 text-center ${
+            statements.length > 0 ? "pb-44 lg:pb-24" : "pb-24"
+          }`}
+        >
+          {/* <HeroBadge
             label={champion ? t.home.championEyebrow : live ? t.home.playingNow : t.brand}
             isChampion={!!champion}
-          />
+          /> */}
           <HeroText
             champion={champion}
             championTitle={t.home.championTitle}
@@ -53,6 +62,7 @@ export default async function HomePage() {
             title2={t.home.title2}
             lede={champion ? t.home.championLede : t.home.lede}
           />
+          <StatementsTicker statements={statements} title={t.home.statements} />
         </div>
 
         <BottomLeftCard
@@ -69,7 +79,7 @@ export default async function HomePage() {
             href="/bracket"
           />
         ) : (
-          <BottomRightCorner title={t.rules.title} subtitle={t.home.ctaRules} href="/rules" />
+          <BottomRightCorner title={''} subtitle={t.home.ctaRules} href="/rules" />
         )}
       </section>
 
@@ -91,6 +101,16 @@ export default async function HomePage() {
         ) : (
           <div className="liquid-glass-panel rounded-2xl px-6 py-14 text-center text-sm text-fg/70">
             {t.home.noUpcoming}
+          </div>
+        )}
+
+        {judgeMatch && (
+          <div className="mt-12">
+            <h2 className="text-lg font-medium tracking-tight text-fg/90">{t.match.exhibition}</h2>
+            <p className="mb-5 mt-1 text-sm text-fg/70">{t.match.exhibitionNote}</p>
+            <div className="sm:max-w-md">
+              <MatchCard match={judgeMatch} players={players} t={t} locale={locale} />
+            </div>
           </div>
         )}
       </section>

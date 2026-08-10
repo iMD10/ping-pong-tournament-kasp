@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createJudgeMatch } from "@/lib/actions";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
+import { playerName } from "@/lib/players";
 import type { Match, Player } from "@/lib/supabase/types";
 
 export function JudgeMatchPanel({
@@ -38,20 +39,27 @@ export function JudgeMatchPanel({
         مباراة استعراضية خارج الشجرة. ما تحسب في الإحصائيات.
       </p>
       {!judgeMatch ? (
-        <div className="flex gap-2">
-          <input
-            value={refereeName}
-            onChange={(e) => setRefereeName(e.target.value)}
-            className="flex-1 rounded-xl bg-fg/[0.06] px-4 py-2.5 text-sm text-fg outline-none focus:bg-fg/[0.1]"
-          />
-          <button
-            disabled={pending}
-            onClick={create}
-            className="rounded-xl bg-fg px-4 py-2.5 text-sm font-medium text-bg transition-colors hover:opacity-90 disabled:opacity-50"
-          >
-            ابدأ
-          </button>
-        </div>
+        <>
+          <p className="mb-2 text-xs text-fg/70">
+            البطل <span className="font-medium text-fg">{playerName(players, championId)}</span> ضد
+            الحكم:
+          </p>
+          <div className="flex gap-2">
+            <input
+              value={refereeName}
+              onChange={(e) => setRefereeName(e.target.value)}
+              aria-label="اسم الحكم"
+              className="flex-1 rounded-xl bg-fg/[0.06] px-4 py-2.5 text-sm text-fg outline-none focus:bg-fg/[0.1]"
+            />
+            <button
+              disabled={pending || !refereeName.trim()}
+              onClick={create}
+              className="rounded-xl bg-fg px-4 py-2.5 text-sm font-medium text-bg transition-colors hover:opacity-90 disabled:opacity-50"
+            >
+              ابدأ
+            </button>
+          </div>
+        </>
       ) : (
         <MatchAdminRow match={judgeMatch} players={players} />
       )}

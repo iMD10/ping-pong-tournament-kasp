@@ -2,10 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Shuffle, AlertTriangle } from "lucide-react";
+import { Shuffle, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { runDraw, resetTournament } from "@/lib/actions";
 
-export function DrawPanel({ drawn, playerCount }: { drawn: boolean; playerCount: number }) {
+export function DrawPanel({
+  drawn,
+  playerCount,
+  manualOpen,
+  onToggleManual,
+}: {
+  drawn: boolean;
+  playerCount: number;
+  manualOpen: boolean;
+  onToggleManual: () => void;
+}) {
   const router = useRouter();
   const [confirmingDraw, setConfirmingDraw] = useState(false);
   const [resetStep, setResetStep] = useState(0);
@@ -61,14 +71,31 @@ export function DrawPanel({ drawn, playerCount }: { drawn: boolean; playerCount:
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setConfirmingDraw(true)}
-            disabled={playerCount < 2}
-            className="flex w-fit items-center gap-2 rounded-full bg-fg px-5 py-2.5 text-sm font-medium text-bg transition-colors hover:opacity-90 disabled:opacity-40"
-          >
-            <Shuffle size={15} />
-            اسحب القرعة
-          </button>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setConfirmingDraw(true)}
+                disabled={playerCount < 2}
+                className="flex items-center gap-2 rounded-full bg-fg px-5 py-2.5 text-sm font-medium text-bg transition-colors hover:opacity-90 disabled:opacity-40"
+              >
+                <Shuffle size={15} />
+                اسحب القرعة
+              </button>
+              <button
+                onClick={onToggleManual}
+                disabled={playerCount < 2}
+                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm transition-colors disabled:opacity-40 ${
+                  manualOpen ? "bg-fg/[0.14] text-fg" : "liquid-glass text-fg/70 hover:text-fg"
+                }`}
+              >
+                <SlidersHorizontal size={15} />
+                رتّبها يدوي
+              </button>
+            </div>
+            <p className="text-xs leading-relaxed text-fg/70">
+              العشوائي يوزّع اللاعبين والاستراحات بنفسه. اليدوي يخليك تحدد كل مواجهة بنفسك.
+            </p>
+          </div>
         )
       ) : (
         <p className="text-sm text-accent">القرعة انسحبت ✓</p>

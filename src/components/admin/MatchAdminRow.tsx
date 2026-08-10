@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Radio, Pencil, CalendarClock, UserX } from "lucide-react";
+import { Radio, Pencil, CalendarClock, UserX, Users } from "lucide-react";
 import type { Match, Player } from "@/lib/supabase/types";
 import { formatScoreLine, gameWinCounts, gamesToWin, ROUND_LABELS_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
@@ -12,17 +12,20 @@ import {
   recordGameResult,
   recordWalkover,
   setLive,
+  setMatchPlayers,
   setSchedule,
 } from "@/lib/actions";
 
 const inputCls =
   "w-16 rounded-lg bg-fg/[0.08] px-2 py-1.5 text-center text-sm tabular-nums text-fg outline-none focus:bg-fg/[0.14]";
+const selectCls =
+  "min-w-0 flex-1 rounded-lg bg-fg/[0.08] px-3 py-2 text-xs text-fg outline-none focus:bg-fg/[0.14] [color-scheme:dark]";
 
 export function MatchAdminRow({ match, players }: { match: Match; players: Player[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<"idle" | "score" | "edit" | "walkover">("idle");
+  const [mode, setMode] = useState<"idle" | "score" | "edit" | "walkover" | "players">("idle");
 
   const [s1, setS1] = useState("");
   const [s2, setS2] = useState("");
@@ -36,10 +39,18 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
 
   const [editWarning, setEditWarning] = useState<{ id: string; round: string }[] | null>(null);
 
+  const [slot1, setSlot1] = useState(match.player1_id ?? "");
+  const [slot2, setSlot2] = useState(match.player2_id ?? "");
+
   const p1Name = playerName(players, match.player1_id);
   const p2Name = playerName(players, match.player2_id);
   const canScore = !!(match.player1_id && match.player2_id) && !match.winner_id && match.outcome_type === "pending";
   const canEdit = !!match.winner_id && match.outcome_type === "score";
+  // Players can be rearranged only while the match has no result of its own.
+  const canAssign =
+    match.round !== "judge" &&
+    match.games.length === 0 &&
+    (match.outcome_type === "pending" || match.outcome_type === "bye");
   const { p1: p1Wins, p2: p2Wins } = gameWinCounts(match.games);
   const need = gamesToWin(match.round);
 
@@ -126,6 +137,18 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
     });
   };
 
+  const submitPlayers = () => {
+    setError(null);
+    startTransition(async () => {
+      const res = await setMatchPlayers(match.id, slot1 || null, slot2 || null);
+      if (!res.ok) setError(res.error);
+      else {
+        setMode("idle");
+        router.refresh();
+      }
+    });
+  };
+
   const toggleLive = () => {
     startTransition(async () => {
       await setLive(match.id, !match.is_live);
@@ -198,7 +221,7 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
 
       {error && <p className="mt-2.5 text-xs text-live">{error}</p>}
 
-      {mode === "idle" && (canScore || canEdit) && (
+      {mode === "idle" && (canScore || canEdit || canAssign) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {canScore && (
             <button
@@ -231,6 +254,19 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
             >
               <Pencil size={13} />
               عدّل
+            </button>
+          )}
+          {canAssign && (
+            <button
+              onClick={() => {
+                setSlot1(match.player1_id ?? "");
+                setSlot2(match.player2_id ?? "");
+                setMode("players");
+              }}
+              className="liquid-glass flex items-center gap-1.5 rounded-full px-3 py-2 text-xs text-fg/70 hover:text-fg"
+            >
+              <Users size={13} />
+              {match.player1_id && match.player2_id ? "غيّر اللاعبين" : "حط لاعبين"}
             </button>
           )}
           {canScore && (
@@ -297,6 +333,45 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {mode === "players" && (
+        <div className="mt-3 flex flex-col gap-2.5 rounded-xl bg-fg/[0.05] p-3.5">
+          <div className="flex items-center gap-2">
+            <select value={slot1} onChange={(e) => setSlot1(e.target.value)} aria-label="اللاعب الأول" className={selectCls}>
+              <option value="">— فاضي —</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id} disabled={p.id === slot2}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+            <span className="shrink-0 text-xs text-fg/55">ضد</span>
+            <select value={slot2} onChange={(e) => setSlot2(e.target.value)} aria-label="اللاعب الثاني" className={selectCls}>
+              <option value="">— فاضي —</option>
+              {players.map((p) => (
+                <option key={p.id} value={p.id} disabled={p.id === slot1}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <p className="text-[12px] leading-relaxed text-fg/70">
+            خلّ الخانة فاضية لو لسه ما تحدد. اللاعب اللي بروحه بالجولة الأولى ياخذ استراحة ويعدّي.
+          </p>
+          <div className="flex gap-2">
+            <button
+              disabled={pending}
+              onClick={submitPlayers}
+              className="rounded-full bg-fg px-4 py-2 text-xs font-medium text-bg disabled:opacity-40"
+            >
+              حفظ
+            </button>
+            <button onClick={() => setMode("idle")} className="rounded-full bg-fg/10 px-4 py-2 text-xs text-fg/70">
+              إلغاء
+            </button>
+          </div>
         </div>
       )}
 

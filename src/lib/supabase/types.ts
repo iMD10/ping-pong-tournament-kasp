@@ -37,7 +37,18 @@ export interface TournamentState {
   drawn: boolean;
   event_date: string | null;
   champion_id: string | null;
+  /** «أفضل شمات» — awarded by the admin, not computed from results. */
+  best_shamat_name: string | null;
+  best_shamat_quote: string | null;
   updated_at: string;
+}
+
+/** A quote from a player or spectator, typed in by the admin. */
+export interface Statement {
+  id: string;
+  name: string;
+  quote: string;
+  created_at: string;
 }
 
 // Minimal hand-written Database type (no generated types needed for this project size)
@@ -58,6 +69,11 @@ export interface Database {
         Row: TournamentState;
         Insert: Partial<TournamentState>;
         Update: Partial<TournamentState>;
+      };
+      statements: {
+        Row: Statement;
+        Insert: Partial<Statement> & { name: string; quote: string };
+        Update: Partial<Statement>;
       };
     };
   };

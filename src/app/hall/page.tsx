@@ -1,4 +1,4 @@
-import { getMatches, getPlayers, playerName } from "@/lib/data";
+import { getMatches, getPlayers, getState, playerName } from "@/lib/data";
 import { computeStats } from "@/lib/stats";
 import { PageShell } from "@/components/PageShell";
 import { KleejaIcon } from "@/components/KleejaIcon";
@@ -18,7 +18,7 @@ function margin(m: Match): number {
 }
 
 export default async function HallPage() {
-  const [players, matches] = await Promise.all([getPlayers(), getMatches()]);
+  const [players, matches, state] = await Promise.all([getPlayers(), getMatches(), getState()]);
   const t = getT();
   const scored = matches.filter((m) => m.outcome_type === "score" && m.games.length > 0);
   const stats = computeStats(players, matches);
@@ -92,6 +92,18 @@ export default async function HallPage() {
           title={t.hall.absent}
           value={absentCount > 0 ? `${absentCount} ${t.hall.cases}` : t.hall.none}
           shame
+        />
+        <Award
+          icon="😈"
+          title={t.hall.bestShamat}
+          value={state?.best_shamat_name || t.hall.none}
+          // The shamat itself is a quote, so it gets quotation marks; the
+          // fallback line is a description of the award and stays bare.
+          note={
+            state?.best_shamat_name && state.best_shamat_quote
+              ? `«${state.best_shamat_quote}»`
+              : t.hall.bestShamatNote
+          }
         />
       </div>
     </PageShell>

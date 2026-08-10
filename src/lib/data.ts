@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { Match, Player, TournamentState } from "@/lib/supabase/types";
+import type { Match, Player, Statement, TournamentState } from "@/lib/supabase/types";
 
 export async function getPlayers(): Promise<Player[]> {
   const supabase = createClient();
@@ -27,6 +27,12 @@ export async function getState(): Promise<TournamentState | null> {
   const supabase = createClient();
   const { data } = await supabase.from("tournament_state").select("*").single();
   return data ?? null;
+}
+
+export async function getStatements(): Promise<Statement[]> {
+  const supabase = createClient();
+  const { data } = await supabase.from("statements").select("*").order("created_at", { ascending: true });
+  return data ?? [];
 }
 
 export { playerName } from "@/lib/players";

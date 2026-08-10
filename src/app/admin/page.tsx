@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getJudgeMatch, getMatches, getPlayers, getState } from "@/lib/data";
+import { getJudgeMatch, getMatches, getPlayers, getState, getStatements } from "@/lib/data";
 import { LoginForm } from "@/components/admin/LoginForm";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
@@ -21,16 +21,23 @@ export default async function AdminPage() {
     );
   }
 
-  const [players, matches, judgeMatch, state] = await Promise.all([
+  const [players, matches, judgeMatch, state, statements] = await Promise.all([
     getPlayers(),
     getMatches(),
     getJudgeMatch(),
     getState(),
+    getStatements(),
   ]);
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
-      <AdminDashboard players={players} matches={matches} judgeMatch={judgeMatch} state={state} />
+      <AdminDashboard
+        players={players}
+        matches={matches}
+        judgeMatch={judgeMatch}
+        state={state}
+        statements={statements}
+      />
     </main>
   );
 }

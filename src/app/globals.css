@@ -152,6 +152,26 @@ body {
 }
 .animate-pulse-dot { animation: pulse-dot 1.6s ease-in-out infinite; }
 
+/* Statements ticker: a vertical loop. The track repeats the list an even number
+   of times, so translating it up by half its height lands a copy exactly where
+   the original started and the loop never shows a seam. */
+@keyframes ticker-up {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+.ticker-track {
+  animation: ticker-up var(--ticker-duration, 40s) linear infinite;
+  will-change: transform;
+}
+.ticker:hover .ticker-track,
+.ticker:focus-within .ticker-track { animation-play-state: paused; }
+
+/* Softens the hard cut where cards enter and leave the window. */
+.ticker-fade {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+}
+
 .thin-scroll::-webkit-scrollbar { height: 6px; width: 6px; }
 .thin-scroll::-webkit-scrollbar-thumb { background: rgb(var(--fg) / 0.15); border-radius: 99px; }
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
@@ -169,5 +189,8 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .animate-float-ball, .animate-pulse-dot, .animate-pulse { animation: none; }
+  /* The ticker still needs to be readable, so it becomes a plain scroller. */
+  .ticker-track { animation: none; }
+  .ticker { overflow-y: auto; }
   html { scroll-behavior: auto; }
 }

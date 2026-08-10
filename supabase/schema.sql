@@ -49,11 +49,31 @@ create table if not exists tournament_state (
   drawn boolean not null default false,
   event_date timestamptz,
   champion_id uuid references players(id) on delete set null,
+  -- «أفضل شمات» — a spectator award, judged by the admin, not by the results.
+  best_shamat_name text,
+  best_shamat_quote text,
   updated_at timestamptz not null default now(),
   constraint singleton check (id = 1)
 );
 
+-- For projects created before the shamat award existed.
+alter table tournament_state add column if not exists best_shamat_name text;
+alter table tournament_state add column if not exists best_shamat_quote text;
+
 insert into tournament_state (id) values (1) on conflict (id) do nothing;
+
+-- ---------------------------------------------------------------------------
+-- statements — quotes from players/spectators, typed in by the admin and
+-- scrolled across the hall of fame page.
+-- ---------------------------------------------------------------------------
+create table if not exists statements (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  quote text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_statements_created on statements (created_at);
 
 -- ---------------------------------------------------------------------------
 -- updated_at triggers
@@ -79,6 +99,7 @@ create trigger trg_state_updated_at before update on tournament_state
 alter table players enable row level security;
 alter table matches enable row level security;
 alter table tournament_state enable row level security;
+alter table statements enable row level security;
 
 drop policy if exists "public read players" on players;
 create policy "public read players" on players for select using (true);
@@ -98,9 +119,32 @@ drop policy if exists "admin write state" on tournament_state;
 create policy "admin write state" on tournament_state for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
+drop policy if exists "public read statements" on statements;
+create policy "public read statements" on statements for select using (true);
+drop policy if exists "admin write statements" on statements;
+create policy "admin write statements" on statements for all
+  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
 -- ---------------------------------------------------------------------------
--- Realtime: add tables to the supabase_realtime publication
+-- Realtime: add tables to the supabase_realtime publication.
+-- Every add is guarded: `alter publication ... add table` errors if the table
+-- is already a member, and the SQL editor runs this file as one transaction,
+-- so a single such error would roll back everything above it.
 -- ---------------------------------------------------------------------------
-alter publication supabase_realtime add table matches;
-alter publication supabase_realtime add table tournament_state;
-alter publication supabase_realtime add table players;
+do $$
+declare
+  t text;
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    return;
+  end if;
+
+  foreach t in array array['players','matches','tournament_state','statements'] loop
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;

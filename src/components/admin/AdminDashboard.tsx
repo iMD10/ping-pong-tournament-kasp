@@ -1,13 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/lib/actions";
 import { PlayerManager } from "@/components/admin/PlayerManager";
 import { DrawPanel } from "@/components/admin/DrawPanel";
+import { ManualDrawPanel } from "@/components/admin/ManualDrawPanel";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
 import { JudgeMatchPanel } from "@/components/admin/JudgeMatchPanel";
+import { ShamatPanel } from "@/components/admin/ShamatPanel";
+import { StatementsPanel } from "@/components/admin/StatementsPanel";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
-import type { Match, Player, TournamentState } from "@/lib/supabase/types";
+import type { Match, Player, Statement, TournamentState } from "@/lib/supabase/types";
 
 const ROUND_RANK: Record<string, number> = { R1: 0, R16: 1, QF: 2, SF: 3, F: 4, judge: 5 };
 
@@ -16,13 +20,16 @@ export function AdminDashboard({
   matches,
   judgeMatch,
   state,
+  statements,
 }: {
   players: Player[];
   matches: Match[];
   judgeMatch: Match | null;
   state: TournamentState | null;
+  statements: Statement[];
 }) {
-  useLiveRefresh();
+  useLiveRefresh(["matches", "tournament_state", "statements"]);
+  const [manualOpen, setManualOpen] = useState(false);
 
   const sorted = [...matches].sort(
     (a, b) => (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot
@@ -46,7 +53,22 @@ export function AdminDashboard({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <PlayerManager players={players} locked={!!state?.drawn} />
-        <DrawPanel drawn={!!state?.drawn} playerCount={players.length} />
+        <DrawPanel
+          drawn={!!state?.drawn}
+          playerCount={players.length}
+          manualOpen={manualOpen}
+          onToggleManual={() => setManualOpen((v) => !v)}
+        />
+      </div>
+
+      {!state?.drawn && manualOpen && players.length >= 2 && (
+        // Remount when the roster size changes so the slot grid matches it.
+        <ManualDrawPanel key={players.length} players={players} onClose={() => setManualOpen(false)} />
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <StatementsPanel statements={statements} players={players} />
+        <ShamatPanel state={state} />
       </div>
 
       <JudgeMatchPanel championId={state?.champion_id ?? null} judgeMatch={judgeMatch} players={players} />

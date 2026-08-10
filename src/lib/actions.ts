@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { generateBracket } from "@/lib/bracket";
+import { buildBracket, generateBracket, validatePairings, type DraftMatch, type Pairing } from "@/lib/bracket";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
 import { validateDeciderScore, validateGameScore } from "@/lib/validation";
 import type { Game, Match, Round } from "@/lib/supabase/types";
@@ -49,6 +49,50 @@ export async function addPlayer(name: string): Promise<ActionResult> {
   return { ok: true, data: null };
 }
 
+/**
+ * Adds a pasted roster in one go. Skips blanks, repeats inside the paste, and
+ * names already registered, then reports what actually landed.
+ */
+export async function addPlayers(
+  names: string[]
+): Promise<ActionResult<{ added: number; skipped: number }>> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  if (state?.drawn) return { ok: false, error: "ما تقدر تضيف لاعبين بعد سحب القرعة" };
+
+  const { data: existing, error: exErr } = await supabase.from("players").select("name");
+  if (exErr) return { ok: false, error: exErr.message };
+
+  const key = (n: string) => n.trim().replace(/\s+/g, " ").toLowerCase();
+  const taken = new Set((existing ?? []).map((p) => key(p.name)));
+
+  const fresh: string[] = [];
+  let skipped = 0;
+  for (const raw of names) {
+    const trimmed = raw.trim().replace(/\s+/g, " ");
+    if (!trimmed) continue;
+    if (taken.has(key(trimmed))) {
+      skipped++;
+      continue;
+    }
+    taken.add(key(trimmed));
+    fresh.push(trimmed);
+  }
+
+  if (fresh.length === 0) {
+    return skipped > 0
+      ? { ok: false, error: "كل الأسماء مسجّلة من قبل" }
+      : { ok: false, error: "اكتب اسم واحد على الأقل" };
+  }
+
+  const { error } = await supabase.from("players").insert(fresh.map((name) => ({ name })));
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/admin");
+  revalidatePath("/players");
+  return { ok: true, data: { added: fresh.length, skipped } };
+}
+
 export async function removePlayer(id: string): Promise<ActionResult> {
   const supabase = await requireAdmin();
   const { data: state } = await supabase.from("tournament_state").select("drawn").single();
@@ -64,17 +108,11 @@ export async function removePlayer(id: string): Promise<ActionResult> {
 // Draw
 // ---------------------------------------------------------------------------
 
-export async function runDraw(): Promise<ActionResult> {
-  const supabase = await requireAdmin();
-  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
-  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
-
-  const { data: players, error: pErr } = await supabase.from("players").select("id");
-  if (pErr) return { ok: false, error: pErr.message };
-  if (!players || players.length < 2) return { ok: false, error: "لازم لاعبين اثنين على الأقل" };
-
-  const draft = generateBracket(players.map((p) => p.id));
-
+/** Writes a freshly built bracket and flips the tournament into "drawn". */
+async function persistDraft(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  draft: DraftMatch[]
+): Promise<ActionResult> {
   // Insert placeholder rows first to get real ids, then patch next_match_id links.
   const insertPayload = draft.map((m) => ({
     round: m.round,
@@ -112,6 +150,34 @@ export async function runDraw(): Promise<ActionResult> {
   return { ok: true, data: null };
 }
 
+export async function runDraw(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+
+  const { data: players, error: pErr } = await supabase.from("players").select("id");
+  if (pErr) return { ok: false, error: pErr.message };
+  if (!players || players.length < 2) return { ok: false, error: "لازم لاعبين اثنين على الأقل" };
+
+  return persistDraft(supabase, generateBracket(players.map((p) => p.id)));
+}
+
+/** Same as runDraw, but the admin decided every first-round pairing by hand. */
+export async function runManualDraw(pairings: Pairing[]): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase.from("tournament_state").select("drawn").single();
+  if (state?.drawn) return { ok: false, error: "القرعة انسحبت من قبل. صفّر البطولة أول لو تبي تعيد." };
+
+  const { data: players, error: pErr } = await supabase.from("players").select("id");
+  if (pErr) return { ok: false, error: pErr.message };
+  if (!players || players.length < 2) return { ok: false, error: "لازم لاعبين اثنين على الأقل" };
+
+  const check = validatePairings(pairings, players.map((p) => p.id));
+  if (!check.valid) return { ok: false, error: check.error };
+
+  return persistDraft(supabase, buildBracket(pairings));
+}
+
 export async function resetTournament(): Promise<ActionResult> {
   const supabase = await requireAdmin();
   await supabase.from("matches").delete().neq("round", "__never__");
@@ -145,17 +211,128 @@ export async function setLive(matchId: string, isLive: boolean): Promise<ActionR
 }
 
 // ---------------------------------------------------------------------------
+// Manual player placement
+// ---------------------------------------------------------------------------
+
+/**
+ * Hand-places players into a match's two slots. Only allowed while the match has
+ * no result yet. A first-round match left with a single player becomes a bye and
+ * advances that player; later rounds keep their empty slot as TBD because an
+ * upstream match still owes them a winner.
+ */
+export async function setMatchPlayers(
+  matchId: string,
+  player1Id: string | null,
+  player2Id: string | null
+): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: match, error: mErr } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (mErr || !match) return { ok: false, error: "المباراة ما فيه لها وجود" };
+
+  if ((match.games as Game[]).length > 0 || (match.outcome_type !== "pending" && match.outcome_type !== "bye")) {
+    return { ok: false, error: "المباراة لها نتيجة، عدّل النتيجة أول" };
+  }
+  if (player1Id && player1Id === player2Id) {
+    return { ok: false, error: "ما ينفع نفس اللاعب بالطرفين" };
+  }
+
+  // A player can only appear once per round.
+  const { data: siblings } = await supabase
+    .from("matches")
+    .select("id, player1_id, player2_id")
+    .eq("round", match.round)
+    .neq("id", matchId);
+  const clash = [player1Id, player2Id].find(
+    (id) => id && siblings?.some((s) => s.player1_id === id || s.player2_id === id)
+  );
+  if (clash) return { ok: false, error: "اللاعب محطوط بمباراة ثانية بنفس الدور" };
+
+  // One player alone is a bye only when nothing can ever fill the other slot.
+  const lone = player1Id && !player2Id ? player1Id : !player1Id && player2Id ? player2Id : null;
+  const winnerId =
+    lone && (await slotIsOrphaned(supabase, matchId, player1Id ? 2 : 1)) ? lone : null;
+
+  // Changing who advances would poison an already-played next match.
+  if (winnerId !== match.winner_id && match.next_match_id) {
+    const { data: next } = await supabase.from("matches").select("*").eq("id", match.next_match_id).single();
+    if (next && ((next.games as Game[]).length > 0 || next.winner_id)) {
+      return { ok: false, error: "المباراة اللي بعدها انلعبت، صفّر نتيجتها أول" };
+    }
+  }
+
+  const { error: updErr } = await supabase
+    .from("matches")
+    .update({
+      player1_id: player1Id,
+      player2_id: player2Id,
+      winner_id: winnerId,
+      outcome_type: winnerId ? "bye" : "pending",
+      outcome_reason: null,
+    })
+    .eq("id", matchId);
+  if (updErr) return { ok: false, error: updErr.message };
+
+  // Keep the downstream slot in sync (clears it when the bye is undone).
+  if (winnerId !== match.winner_id) await propagateWinner(supabase, match as Match, winnerId);
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
 // Score entry
 // ---------------------------------------------------------------------------
+
+/** True when nothing feeds `slot` of `matchId`, so that slot stays empty forever. */
+async function slotIsOrphaned(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  matchId: string,
+  slot: 1 | 2
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("matches")
+    .select("id")
+    .eq("next_match_id", matchId)
+    .eq("next_match_slot", slot);
+  return !data || data.length === 0;
+}
 
 async function propagateWinner(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
   match: Match,
-  winnerId: string
+  winnerId: string | null
 ) {
   if (!match.next_match_id || !match.next_match_slot) return;
   const field = match.next_match_slot === 1 ? "player1_id" : "player2_id";
   await supabase.from("matches").update({ [field]: winnerId }).eq("id", match.next_match_id);
+  await resolveWalkthrough(supabase, match.next_match_id);
+}
+
+/**
+ * A match holding one player whose opposite slot has no feeder can never be
+ * played, so that player walks through to the next round. Cascades, since the
+ * walkthrough may orphan the match after it too.
+ */
+async function resolveWalkthrough(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>,
+  matchId: string
+) {
+  const { data: m } = await supabase.from("matches").select("*").eq("id", matchId).single();
+  if (!m) return;
+  // Never touch a match that has been played or ruled on.
+  if ((m.games as Game[]).length > 0) return;
+  if (m.outcome_type !== "pending" && m.outcome_type !== "bye") return;
+
+  const lone = m.player1_id && !m.player2_id ? m.player1_id : !m.player1_id && m.player2_id ? m.player2_id : null;
+  const walksThrough = lone != null && (await slotIsOrphaned(supabase, matchId, m.player1_id ? 2 : 1));
+  const winnerId = walksThrough ? lone : null;
+  if (winnerId === m.winner_id) return;
+
+  await supabase
+    .from("matches")
+    .update({ winner_id: winnerId, outcome_type: winnerId ? "bye" : "pending" })
+    .eq("id", matchId);
+  await propagateWinner(supabase, m as Match, winnerId);
 }
 
 /** Records one game's score for a match, appending to its games array. */
@@ -318,6 +495,60 @@ export async function editResult(
 }
 
 // ---------------------------------------------------------------------------
+// «أفضل شمات» — spectator award, judged by the admin
+// ---------------------------------------------------------------------------
+
+/** Sets (or clears, with an empty name) the best-shamat award. */
+export async function setBestShamat(name: string, quote: string): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const cleanName = name.trim().replace(/\s+/g, " ");
+  const cleanQuote = quote.trim().replace(/\s+/g, " ");
+  if (cleanName.length > 60) return { ok: false, error: "الاسم طويل، خلّه أقصر" };
+  if (cleanQuote.length > 200) return { ok: false, error: "الشماتة طويلة، اختصرها" };
+  if (!cleanName && cleanQuote) return { ok: false, error: "اكتب اسم الشامت" };
+
+  const { error } = await supabase
+    .from("tournament_state")
+    .update({
+      best_shamat_name: cleanName || null,
+      best_shamat_quote: cleanName ? cleanQuote || null : null,
+    })
+    .eq("id", 1);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Statements — quotes scrolled across the hall of fame page
+// ---------------------------------------------------------------------------
+
+export async function addStatement(name: string, quote: string): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const cleanName = name.trim().replace(/\s+/g, " ");
+  const cleanQuote = quote.trim().replace(/\s+/g, " ");
+  if (!cleanName) return { ok: false, error: "اكتب اسم صاحب التصريح" };
+  if (!cleanQuote) return { ok: false, error: "اكتب التصريح" };
+  if (cleanName.length > 60) return { ok: false, error: "الاسم طويل، خلّه أقصر" };
+  if (cleanQuote.length > 200) return { ok: false, error: "التصريح طويل، اختصره" };
+
+  const { error } = await supabase.from("statements").insert({ name: cleanName, quote: cleanQuote });
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+export async function removeStatement(id: string): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("statements").delete().eq("id", id);
+  if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
 // Judge match (bonus exhibition, outside the bracket)
 // ---------------------------------------------------------------------------
 
@@ -326,9 +557,12 @@ export async function createJudgeMatch(championId: string, refereeName: string):
   const { data: existing } = await supabase.from("matches").select("id").eq("round", "judge").maybeSingle();
   if (existing) return { ok: false, error: "مباراة القاضي موجودة من قبل" };
 
+  const name = refereeName.trim().replace(/\s+/g, " ");
+  if (!name) return { ok: false, error: "اكتب اسم الحكم" };
+
   const { data: referee, error: refErr } = await supabase
     .from("players")
-    .insert({ name: refereeName })
+    .insert({ name })
     .select("id")
     .single();
   if (refErr || !referee) return { ok: false, error: refErr?.message ?? "فشل إنشاء القاضي" };

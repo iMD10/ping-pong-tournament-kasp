@@ -4,8 +4,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Shuffle, AlertTriangle, SlidersHorizontal } from "lucide-react";
 import { runDraw, runGroupDraw, resetTournament } from "@/lib/actions";
-import { entryRoundCode, groupSizes, possibleGroupCounts } from "@/lib/groups";
+import { entryRoundCode } from "@/lib/groups";
 import { ROUND_LABELS_AR } from "@/lib/match";
+import type { GroupSettings } from "@/components/admin/useGroupSettings";
 import type { TournamentFormat } from "@/lib/supabase/types";
 
 const selectCls =
@@ -16,6 +17,7 @@ export function DrawPanel({
   playerCount,
   format,
   onFormatChange,
+  groups,
   manualOpen,
   onToggleManual,
   liveDrawRunning,
@@ -24,6 +26,7 @@ export function DrawPanel({
   playerCount: number;
   format: TournamentFormat;
   onFormatChange: (format: TournamentFormat) => void;
+  groups: GroupSettings;
   manualOpen: boolean;
   onToggleManual: () => void;
   liveDrawRunning: boolean;
@@ -34,22 +37,8 @@ export function DrawPanel({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // The roster can still change under this panel, so both picks fall back to a
-  // sane option whenever the current one stops fitting the player count.
-  const groupCounts = possibleGroupCounts(playerCount);
-  const [chosenGroupCount, setGroupCount] = useState(4);
-  const groupCount = groupCounts.includes(chosenGroupCount)
-    ? chosenGroupCount
-    : groupCounts[Math.floor(groupCounts.length / 2)] ?? 0;
-  const sizes = groupCount > 0 ? groupSizes(playerCount, groupCount) : [];
-  const smallestGroup = sizes.length > 0 ? Math.min(...sizes) : 0;
-  // At least one player in every group has to go home, so the last place can
-  // never qualify.
-  const advanceOptions = Array.from({ length: Math.max(0, smallestGroup - 1) }, (_, i) => i + 1);
-  const [advance, setAdvance] = useState(2);
-  const advancePerGroup = advanceOptions.includes(advance) ? advance : advanceOptions[0] ?? 1;
-  const qualifiers = groupCount * advancePerGroup;
-  const groupsPossible = groupCounts.length > 0 && advanceOptions.length > 0 && qualifiers >= 2;
+  const { count: groupCount, advance: advancePerGroup, qualifiers, sizes } = groups;
+  const groupsPossible = groups.possible;
 
   const draw = () => {
     setError(null);
@@ -147,10 +136,10 @@ export function DrawPanel({
                         عدد المجموعات
                         <select
                           value={groupCount}
-                          onChange={(e) => setGroupCount(Number(e.target.value))}
+                          onChange={(e) => groups.setCount(Number(e.target.value))}
                           className={selectCls}
                         >
-                          {groupCounts.map((g) => (
+                          {groups.counts.map((g) => (
                             <option key={g} value={g}>
                               {g}
                             </option>
@@ -161,10 +150,10 @@ export function DrawPanel({
                         يتأهل من كل مجموعة
                         <select
                           value={advancePerGroup}
-                          onChange={(e) => setAdvance(Number(e.target.value))}
+                          onChange={(e) => groups.setAdvance(Number(e.target.value))}
                           className={selectCls}
                         >
-                          {advanceOptions.map((a) => (
+                          {groups.advanceOptions.map((a) => (
                             <option key={a} value={a}>
                               {a}
                             </option>
@@ -195,22 +184,20 @@ export function DrawPanel({
                 <Shuffle size={15} />
                 {format === "groups" ? "اسحب المجموعات" : "اسحب القرعة"}
               </button>
-              {format === "knockout" && (
-                <button
-                  onClick={onToggleManual}
-                  disabled={playerCount < 2}
-                  className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm transition-colors disabled:opacity-40 ${
-                    manualOpen ? "bg-fg/[0.14] text-fg" : "liquid-glass text-fg/70 hover:text-fg"
-                  }`}
-                >
-                  <SlidersHorizontal size={15} />
-                  رتّبها يدوي
-                </button>
-              )}
+              <button
+                onClick={onToggleManual}
+                disabled={playerCount < 2 || (format === "groups" && !groupsPossible)}
+                className={`flex items-center gap-2 rounded-full px-5 py-2.5 text-sm transition-colors disabled:opacity-40 ${
+                  manualOpen ? "bg-fg/[0.14] text-fg" : "liquid-glass text-fg/70 hover:text-fg"
+                }`}
+              >
+                <SlidersHorizontal size={15} />
+                {format === "groups" ? "اختر اللاعبين بنفسك" : "رتّبها يدوي"}
+              </button>
             </div>
             <p className="text-xs leading-relaxed text-fg/70">
               {format === "groups"
-                ? "الأدوار الإقصائية تنبني من المتأهلين بعد ما تخلص كل مباريات المجموعات."
+                ? "العشوائي يقسّم اللاعبين على المجموعات بنفسه، واليدوي يخليك تحدد مين بأي مجموعة. الأدوار الإقصائية تنبني من المتأهلين بعد ما تخلص كل مباريات المجموعات."
                 : "العشوائي يوزّع اللاعبين والاستراحات بنفسه. اليدوي يخليك تحدد كل مواجهة بنفسك."}
             </p>
           </div>

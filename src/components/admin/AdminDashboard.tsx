@@ -6,6 +6,8 @@ import { signOut } from "@/lib/actions";
 import { PlayerManager } from "@/components/admin/PlayerManager";
 import { DrawPanel } from "@/components/admin/DrawPanel";
 import { ManualDrawPanel } from "@/components/admin/ManualDrawPanel";
+import { ManualGroupDrawPanel } from "@/components/admin/ManualGroupDrawPanel";
+import { useGroupSettings } from "@/components/admin/useGroupSettings";
 import { LiveDrawPanel } from "@/components/admin/LiveDrawPanel";
 import { GroupsPanel } from "@/components/admin/GroupsPanel";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
@@ -50,6 +52,9 @@ export function AdminDashboard({
   const format = state?.drawn ? savedFormat : pickedFormat;
   const groupsFormat = format === "groups";
   const knockoutStarted = matches.some((m) => m.round !== "G");
+  // Shared by the draw panel and the by-hand arrangement, so the group count
+  // and qualifier count mean the same thing in both.
+  const groupSettings = useGroupSettings(players.length);
 
   const sorted = [...matches].sort(
     (a, b) => (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot
@@ -78,6 +83,7 @@ export function AdminDashboard({
           playerCount={players.length}
           format={format}
           onFormatChange={setPickedFormat}
+          groups={groupSettings}
           manualOpen={manualOpen}
           onToggleManual={() => setManualOpen((v) => !v)}
           liveDrawRunning={liveDrawRunning}
@@ -87,6 +93,16 @@ export function AdminDashboard({
       {!state?.drawn && !groupsFormat && !liveDrawRunning && manualOpen && players.length >= 2 && (
         // Remount when the roster size changes so the slot grid matches it.
         <ManualDrawPanel key={players.length} players={players} onClose={() => setManualOpen(false)} />
+      )}
+
+      {!state?.drawn && groupsFormat && !liveDrawRunning && manualOpen && groupSettings.possible && (
+        // Same remount rule, plus the group count: both reshape the board.
+        <ManualGroupDrawPanel
+          key={`${players.length}-${groupSettings.count}`}
+          players={players}
+          settings={groupSettings}
+          onClose={() => setManualOpen(false)}
+        />
       )}
 
       {/* The on-air ceremony seats a knockout tree, so it stands down while the

@@ -1,0 +1,21 @@
+node_modules
+.next
+.env.local
+.env
+.env*.local
+out
+*.log
+.vercel
+
+# Build artifacts
+*.tsbuildinfo
+next-env.d.ts
+
+# Local tool state — settings.local.json records approved commands verbatim,
+# which can capture tokens typed on a command line. Never commit it.
+.claude/settings.local.json
+.claude/*.local.json
+
+# OS
+.DS_Store
+Thumbs.db

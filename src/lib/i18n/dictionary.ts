@@ -157,7 +157,7 @@ export const dict = {
       awards: "الألقاب",
       // كل لقب يشرح نفسه: القاعدة اللي انحسب فيها، عشان ما يصير كلام ما له أساس.
       hints: {
-        malKleeja: "كل شوط انتهى 11-0 أو 12-0",
+        malKleeja: "كل شوط انتهى 11-0",
         blowout: "أكبر فرق نقاط بمباراة كاملة، وإذا تعادلوا الدور الأبعد يفوز",
         deciderSurvivor: "أكثر لاعب فاز بمباراة راحت ديسايدر",
         longestDecider: "الديسايدر اللي طوّل أكثر من غيره",
@@ -355,7 +355,7 @@ export const dict = {
       // Each award states the rule it was computed from, so nothing reads as
       // an opinion the page can't back up.
       hints: {
-        malKleeja: "Every game that ended 11-0 or 12-0",
+        malKleeja: "Every game that ended 11-0",
         blowout: "Biggest point gap across a whole match; a tie goes to the later round",
         deciderSurvivor: "Most matches won after going to a decider",
         longestDecider: "The decider that ran longest",
@@ -418,7 +418,7 @@ export const RULES: Record<Lang, string[]> = {
     "النتيجة الصحيحة للشوط: 11 مقابل أي رقم من 0 إلى 10، أو 12 مقابل 0 إلى 9 إذا خلص الشوط بالنقطة المضاعفة. ما به توقف مبكر، كل شوط يكمل لين 11.",
     "نقاط المجموعات: الفوز بفارق أقل من 6 نقاط = نقطة وحدة للفايز وصفر للخاسر. والفوز بفارق 6 نقاط أو أكثر = نقطتين للفايز وتنخصم نقطة من الخاسر.",
     "ترتيب المجموعة بنقاط المجموعات. وإذا تعادل لاعبان بالنقاط، تفصل بينهم المواجهة المباشرة، ثم فرق النقاط، ثم النقاط اللي سجلها.",
-    "من يخسر شوط 11-0 أو 12-0 ياخذ وسام «ما لك كليجا».",
+    "من يخسر شوط 11-0 ياخذ وسام «ما لك كليجا».",
     "الحكم الرسمي للبطولة هو عبدالله الهليس، وهو المسؤول عن هذي القوانين وقراراته بشأنها نهائية، وهو سيلعب ايضا مباراة خاصة مع الفايو بالبطولة.",
   ],
   en: [
@@ -433,7 +433,7 @@ export const RULES: Record<Lang, string[]> = {
     "A valid game score is 11 against any number from 0 to 10, or 12 against 0 to 9 when the declared double point finished it. There is no early stop, every game runs to 11.",
     "Group points: winning by less than 6 is worth 1 point to the winner and nothing to the loser. Winning by 6 or more is worth 2, and the loser is docked 1.",
     "Group tables are ranked on group points. If two players are level, their head-to-head separates them, then point difference, then points scored.",
-    "Losing a game 11-0 or 12-0 earns you the «No Kleeja For You» badge.",
+    "Losing a game 11-0 earns you the «No Kleeja For You» badge.",
     "The tournament's official referee is Abdullah Al-Helais. He's responsible for these rules, his rulings on them are final, and he's the one who crowns the tournament winner.",
   ],
 };

@@ -6,11 +6,11 @@ export type GameOutcome =
 
 /**
  * Validates a single game's main score against the rulebook.
- * Valid: 11-x (x between 1 and 9), 7-0, or 10-10 (opens a decider, no winner yet).
+ * Valid: 11-x (x between 0 and 9), or 10-10 (opens a decider, no winner yet).
  *
- * The 7-0 stop is MANDATORY, which makes every shutout above 7 impossible:
- * 8-0, 9-0, 10-0 and 11-0 are all rejected, because the game must have ended
- * the moment it reached 7-0.
+ * Every game runs to 11. There is no early stop, so a shutout is 11-0 and
+ * nothing shorter: with group tables ranked on points, ending a whitewash at
+ * 7-0 would leave the winner behind someone who merely won 11-1.
  */
 export function validateGameScore(score1: number, score2: number): GameOutcome {
   if (!Number.isInteger(score1) || !Number.isInteger(score2)) {
@@ -25,30 +25,17 @@ export function validateGameScore(score1: number, score2: number): GameOutcome {
     return { valid: true, needsDecider: true, winner: null, mercy: false };
   }
 
-  // 7-0, mandatory stop (either direction)
-  if ((score1 === 7 && score2 === 0) || (score1 === 0 && score2 === 7)) {
-    return { valid: true, needsDecider: false, winner: score1 === 7 ? 1 : 2, mercy: true };
+  // 11-x, 0 <= x <= 9; 11-0 is the shutout that earns «ما لك كليجا».
+  if (score1 === 11 && score2 >= 0 && score2 <= 9) {
+    return { valid: true, needsDecider: false, winner: 1, mercy: score2 === 0 };
   }
-
-  // A shutout can never pass 7-0, so reject 8-0 … 11-0 with a rule-specific message.
-  if ((score1 === 0 && score2 > 7) || (score2 === 0 && score1 > 7)) {
-    return {
-      valid: false,
-      error: `نتيجة غير صحيحة (${score1}-${score2}). المباراة لازم توقف عند 7-0.`,
-    };
-  }
-
-  // 11-x, 1 <= x <= 9
-  if (score1 === 11 && score2 >= 1 && score2 <= 9) {
-    return { valid: true, needsDecider: false, winner: 1, mercy: false };
-  }
-  if (score2 === 11 && score1 >= 1 && score1 <= 9) {
-    return { valid: true, needsDecider: false, winner: 2, mercy: false };
+  if (score2 === 11 && score1 >= 0 && score1 <= 9) {
+    return { valid: true, needsDecider: false, winner: 2, mercy: score1 === 0 };
   }
 
   return {
     valid: false,
-    error: `نتيجة غير صحيحة (${score1}-${score2}). المسموح: 11-x (x من 1 إلى 9)، أو 7-0، أو 10-10 لفتح الديسايدر.`,
+    error: `نتيجة غير صحيحة (${score1}-${score2}). المسموح: 11-x (x من 0 إلى 9)، أو 10-10 لفتح الديسايدر.`,
   };
 }
 
@@ -79,5 +66,5 @@ export function validateDeciderScore(score1: number, score2: number): DeciderOut
 }
 
 export function isMalKKleeja(score1: number | null, score2: number | null): boolean {
-  return (score1 === 7 && score2 === 0) || (score1 === 0 && score2 === 7);
+  return (score1 === 11 && score2 === 0) || (score1 === 0 && score2 === 11);
 }

@@ -50,7 +50,7 @@ the login screen behind it is the second layer of protection.
 - `supabase/schema.sql` — full DB schema, RLS policies, realtime publication.
 - `supabase/group-stage-migration.sql` — just the group-stage columns, for a
   database created before that feature (already part of `schema.sql`).
-- `src/lib/validation.ts` — the scoring rulebook (11-x, 7-0 mercy, 10-10 decider).
+- `src/lib/validation.ts` — the scoring rulebook (11-x, 11-0 shutout, 10-10 decider).
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
 - `src/lib/groups.ts` — group draw, round-robin fixtures, standings, and the
   seeding that turns qualifiers into a knockout tree.

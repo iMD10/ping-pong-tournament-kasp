@@ -1,4 +1,4 @@
-import { nextPowerOfTwo, roundCodeForDistance, type Pairing } from "@/lib/bracket";
+import { buildBracket, nextPowerOfTwo, roundCodeForDistance, type Pairing } from "@/lib/bracket";
 import { totalPointsFor } from "@/lib/match";
 import type { Match, Round } from "@/lib/supabase/types";
 
@@ -116,11 +116,30 @@ export interface GroupStanding {
 }
 
 /**
+ * Wins each player in `players` picked up in matches against each other —
+ * not against the rest of the group. Used to break ties between players
+ * level on wins: whoever won their head-to-head gets the edge.
+ */
+function headToHeadWins(players: string[], groupMatches: Match[]): Map<string, number> {
+  const wins = new Map(players.map((id) => [id, 0]));
+  const inTie = new Set(players);
+  for (const m of groupMatches) {
+    if (!m.player1_id || !m.player2_id || !m.winner_id) continue;
+    if (!inTie.has(m.player1_id) || !inTie.has(m.player2_id)) continue;
+    const w = wins.get(m.winner_id);
+    if (w != null) wins.set(m.winner_id, w + 1);
+  }
+  return wins;
+}
+
+/**
  * The table for one group.
  *
- * Ranking is wins first — nothing else — and points only break a tie, by
- * difference and then by points scored. A walkover still counts as a win and a
- * loss; it just brings no points with it.
+ * Ranking is wins first. Players level on wins are then split by their head-
+ * to-head record against each other (whoever won that match ranks above),
+ * and only players still level after that fall back to points — difference,
+ * then points scored. A walkover still counts as a win and a loss; it just
+ * brings no points with it.
  */
 export function computeStandings(members: string[], groupMatches: Match[]): GroupStanding[] {
   const table = new Map<string, GroupStanding>(
@@ -162,13 +181,29 @@ export function computeStandings(members: string[], groupMatches: Match[]): Grou
 
   const rows = [...table.values()];
   for (const row of rows) row.pointDiff = row.pointsFor - row.pointsAgainst;
-  return rows.sort(
-    (a, b) =>
-      b.wins - a.wins ||
-      a.losses - b.losses ||
-      b.pointDiff - a.pointDiff ||
-      b.pointsFor - a.pointsFor
-  );
+
+  const byWins = [...rows].sort((a, b) => b.wins - a.wins);
+  const ranked: GroupStanding[] = [];
+  for (let i = 0; i < byWins.length; ) {
+    let j = i + 1;
+    while (j < byWins.length && byWins[j].wins === byWins[i].wins) j++;
+    const tied = byWins.slice(i, j);
+    if (tied.length > 1) {
+      const h2h = headToHeadWins(
+        tied.map((row) => row.playerId),
+        groupMatches
+      );
+      tied.sort(
+        (a, b) =>
+          h2h.get(b.playerId)! - h2h.get(a.playerId)! ||
+          b.pointDiff - a.pointDiff ||
+          b.pointsFor - a.pointsFor
+      );
+    }
+    ranked.push(...tied);
+    i = j;
+  }
+  return ranked;
 }
 
 /** True when two rows are level on everything the ranking looks at. */
@@ -304,6 +339,71 @@ export function knockoutPairingsFromQualifiers(qualifiersByGroup: string[][]): P
     if (!clashes(pairings)) return pairings;
   }
   return fallback ?? [];
+}
+
+/** One place in a group table that a knockout slot is waiting on. */
+export interface ProjectedSlot {
+  groupNo: number;
+  /** 0 = group winner, 1 = runner-up, … */
+  place: number;
+  /** Who is already standing there, once the group has stopped moving. */
+  playerId: string | null;
+}
+
+/** A knockout match as it can be drawn before the qualifiers are known. */
+export interface ProjectedMatch {
+  id: string;
+  round: Round;
+  slot1: ProjectedSlot | null;
+  slot2: ProjectedSlot | null;
+  bye: boolean;
+  nextId: string | null;
+  nextSlot: 1 | 2 | null;
+}
+
+/**
+ * The knockout tree the current groups are going to produce, drawn before it
+ * exists.
+ *
+ * The seeding depends on the shape of the group stage, not on who wins it, so
+ * running the real pipeline over placeholder qualifiers — "group 0, first
+ * place" — lays out exactly the tree `buildKnockoutFromGroups` will insert,
+ * with every slot labelled by the place that will fill it. Places in a group
+ * that has finished carry their player along, so the tree fills in group by
+ * group instead of all at once at the end.
+ */
+export function projectKnockout(groups: GroupView[], advancePerGroup: number): ProjectedMatch[] {
+  if (groups.length === 0) return [];
+
+  const qualifiers = groups.map((g) =>
+    Array.from(
+      { length: Math.min(advancePerGroup, g.standings.length) },
+      (_, place) => `${g.groupNo}:${place}`
+    )
+  );
+  if (qualifiers.reduce((sum, q) => sum + q.length, 0) < 2) return [];
+
+  const byGroupNo = new Map(groups.map((g) => [g.groupNo, g]));
+  const slotFor = (token: string | null): ProjectedSlot | null => {
+    if (token == null) return null;
+    const [groupNo, place] = token.split(":").map(Number);
+    const group = byGroupNo.get(groupNo);
+    return {
+      groupNo,
+      place,
+      playerId: group?.complete ? group.standings[place]?.playerId ?? null : null,
+    };
+  };
+
+  return buildBracket(knockoutPairingsFromQualifiers(qualifiers)).map((m, i) => ({
+    id: `p${i}`,
+    round: m.round,
+    slot1: slotFor(m.player1Id),
+    slot2: slotFor(m.player2Id),
+    bye: m.outcomeType === "bye",
+    nextId: m.nextIndex == null ? null : `p${m.nextIndex}`,
+    nextSlot: m.nextSlot,
+  }));
 }
 
 /** The knockout round `qualifierCount` players walk into (16 of them -> R16). */

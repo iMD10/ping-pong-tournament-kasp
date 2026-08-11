@@ -78,13 +78,17 @@ export function GroupTable({
                     i + 1
                   )}
                 </td>
-                <td className="max-w-0 truncate px-2 py-2.5">
-                  <span className={qualifies(i) ? "font-semibold text-fg" : "text-fg/70"}>
-                    {playerName(players, row.playerId)}
-                  </span>
-                  {!group.complete && tieOnTheLine(row, i) && (
-                    <span className="ms-2 text-[11px] text-fg/45">{t.groups.tiedNote}</span>
-                  )}
+                <td className="max-w-0 px-2 py-2.5">
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      className={`truncate ${qualifies(i) ? "font-semibold text-fg" : "text-fg/70"}`}
+                    >
+                      {playerName(players, row.playerId)}
+                    </span>
+                    {!group.complete && tieOnTheLine(row, i) && (
+                      <span className="shrink-0 text-[11px] text-fg/45">{t.groups.tiedNote}</span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/55">{row.played}</td>
                 <td className="px-1 py-2.5 text-center font-semibold tabular-nums text-fg">{row.wins}</td>

@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, LayoutList, Network, Trophy, Users } from "lucide-react";
 import type { Match, Player, Round } from "@/lib/supabase/types";
-import { groupsFromMatches } from "@/lib/groups";
+import { groupsFromMatches, projectKnockout } from "@/lib/groups";
 import { playerName } from "@/lib/players";
 import { GroupTable } from "@/components/GroupTable";
 import { MatchCard } from "@/components/MatchCard";
+import { ProjectedBracket } from "@/components/ProjectedBracket";
 import { TreeNode } from "@/components/TreeNode";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
 import type { Dict } from "@/lib/i18n/dictionary";
@@ -38,6 +39,13 @@ export function BracketView({
   const knockout = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
   const hasGroups = groups.length > 0;
   const knockoutStarted = knockout.length > 0;
+
+  // Until the qualifiers are seeded the tree is empty, but its shape is already
+  // decided — so draw it with the group places standing in for the players.
+  const projected = useMemo(
+    () => (knockoutStarted ? [] : projectKnockout(groups, advancePerGroup)),
+    [groups, advancePerGroup, knockoutStarted]
+  );
 
   const [view, setView] = useState<ViewMode>(hasGroups && !knockoutStarted ? "groups" : "tree");
   const [tab, setTab] = useState<"all" | Round>("all");
@@ -194,6 +202,11 @@ export function BracketView({
                 </>
               )}
             </div>
+          </div>
+        ) : projected.length > 0 ? (
+          <div className="flex flex-col gap-4">
+            <p className="text-center text-xs text-fg/55">{t.groups.projectedNote}</p>
+            <ProjectedBracket matches={projected} players={players} t={t} />
           </div>
         ) : (
           <p className="py-10 text-center text-sm text-fg/70">{emptyTree}</p>

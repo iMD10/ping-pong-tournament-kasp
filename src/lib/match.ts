@@ -37,7 +37,7 @@ export function seriesWinner(round: Round, games: Game[]): 1 | 2 | null {
   return null;
 }
 
-/** Did «ما لك كليجا» fire anywhere in this match (any game ending exactly 7-0)? */
+/** Did «ما لك كليجا» fire anywhere in this match (any game ending exactly 11-0)? */
 export function matchHasMalKKleeja(match: Pick<Match, "games">): boolean {
   return match.games.some((g) => isMalKKleeja(g.score1, g.score2));
 }

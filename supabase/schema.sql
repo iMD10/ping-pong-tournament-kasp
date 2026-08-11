@@ -25,7 +25,8 @@ create table if not exists matches (
   player1_id uuid references players(id) on delete set null,
   player2_id uuid references players(id) on delete set null,
   -- Array of games: [{ score1, score2, decider_score1?, decider_score2? }, ...]
-  -- Every round is a single game except 'SF' and 'F' (best of 3, first to 2).
+  -- 'G' is a single game; 'R1'/'R16'/'QF' are best of 3, 'SF' best of 5, and
+  -- 'F' best of 7.
   games jsonb not null default '[]'::jsonb,
   winner_id uuid references players(id) on delete set null,
   outcome_type text not null default 'pending', -- pending | score | absent | withdrew | bye

@@ -54,7 +54,7 @@ the login screen behind it is the second layer of protection.
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
 - `src/lib/groups.ts` — group draw, round-robin fixtures, standings, and the
   seeding that turns qualifiers into a knockout tree.
-- `src/lib/match.ts` — best-of-3 final logic, «ما لك كليجا» detection.
+- `src/lib/match.ts` — series lengths per round (best of 3 / 5 / 7), «ما لك كليجا» detection.
 - `src/lib/time.ts` — the tournament clock: every match time is written and read
   in `Asia/Riyadh`, whatever zone the device or the server happens to be in.
 - `src/lib/actions.ts` — all admin server actions (draw, scoring, edit/recompute, reset).
@@ -87,7 +87,7 @@ so results are worth checking before pressing the button.
 
 Every match card on `/admin` has **امسح النتيجة**, which puts the match back to
 "not played yet" — for a score typed against a match that never happened, a
-walkover called too early, or a wrong first game of a best-of-three. Before it
+walkover called too early, or a wrong first game of a series. Before it
 wipes anything it lists the later matches that were built on that winner, since
 those are voided along with it (and a voided final un-crowns the champion). A
 bye is the one thing it won't touch: that follows from who is placed in the

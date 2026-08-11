@@ -134,7 +134,7 @@ export function rankStats(players: Player[], matches: Match[]): RankedStats[] {
 
 /**
  * Total point margin across every game of a match. Reading only the last game
- * would hide two thirds of a best-of-three thrashing.
+ * would hide most of a multi-game thrashing.
  */
 export function matchMargin(m: Match): number {
   if (m.games.length === 0) return -1;

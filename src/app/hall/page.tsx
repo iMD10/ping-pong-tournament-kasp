@@ -4,6 +4,7 @@ import { ROUND_ORDER, matchMargin, rankStats, summarise, topTied, topTiedBy } fr
 import { PageShell } from "@/components/PageShell";
 import { StatsTable, SummaryStrip } from "@/components/StatsTable";
 import { KleejaIcon } from "@/components/KleejaIcon";
+import { ScorePair } from "@/components/ScorePair";
 import { getT } from "@/lib/i18n/server";
 import { isMalKKleeja } from "@/lib/validation";
 import type { Match, Player } from "@/lib/supabase/types";
@@ -177,11 +178,18 @@ export default async function HallPage() {
               : "-"
           }
           note={
-            longestDecider
-              ? `${t.match.decider} ${longestDecider.game.decider_score1}-${longestDecider.game.decider_score2} · ${
-                  t.rounds[longestDecider.match.round]
-                }`
-              : undefined
+            longestDecider ? (
+              // The names above read player one first, so the score under them
+              // has to be laid out rather than written, or the two disagree.
+              <span className="inline-flex items-center gap-1">
+                {t.match.decider}
+                <ScorePair
+                  score1={longestDecider.game.decider_score1!}
+                  score2={longestDecider.game.decider_score2!}
+                />
+                · {t.rounds[longestDecider.match.round]}
+              </span>
+            ) : undefined
           }
         />
         <Award
@@ -251,7 +259,7 @@ function Award({
   /** The rule the award was computed from, so the card explains itself. */
   hint: string;
   value: string;
-  note?: string;
+  note?: ReactNode;
   /** Where the award points, when it names exactly one player. */
   href?: string;
   shame?: boolean;

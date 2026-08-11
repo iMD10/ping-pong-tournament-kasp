@@ -4,6 +4,9 @@ import { groupLabel, isTiedWith, type GroupStanding, type GroupView } from "@/li
 import { playerName } from "@/lib/players";
 import type { Dict } from "@/lib/i18n/dictionary";
 
+/** A lone + or − is a neutral character, so an Arabic page hangs it off the
+ * wrong end of the digits and +5 reads as 5+. Every cell showing one is pinned
+ * to ltr; being centred, it looks the same in both languages. */
 function signed(n: number): string {
   return n > 0 ? `+${n}` : String(n);
 }
@@ -94,7 +97,9 @@ export function GroupTable({
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/55">{row.played}</td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{row.wins}</td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{row.losses}</td>
-                <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{signed(row.pointDiff)}</td>
+                <td dir="ltr" className="px-1 py-2.5 text-center tabular-nums text-fg/70">
+                  {signed(row.pointDiff)}
+                </td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/55">{row.pointsFor}</td>
                 <td className="px-1 py-2.5 text-center font-semibold tabular-nums text-fg">{row.points}</td>
               </tr>

@@ -64,14 +64,6 @@ export function totalPointsFor(games: Game[], side: 1 | 2): number {
   }, 0);
 }
 
-export function formatScoreLine(game: Game): string {
-  const main = `${game.score1}-${game.score2}`;
-  if (game.score1 === 10 && game.score2 === 10 && game.decider_score1 != null) {
-    return `${main} (ديسايدر ${game.decider_score1}-${game.decider_score2})`;
-  }
-  return main;
-}
-
 export const ROUND_LABELS_AR: Record<Round, string> = {
   G: "دور المجموعات",
   R1: "الجولة الأولى",

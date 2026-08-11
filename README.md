@@ -70,8 +70,10 @@ The admin picks one before the draw, on `/admin`:
   random, by hand, or live on air.
 - **مجموعات (groups)** — the roster is dealt into round-robin groups (at least
   3 players each) and everyone plays everyone in their group once. Tables are
-  ranked on **wins and losses alone**; a tie is broken by point difference and
-  then by points scored. When every group match has a result, one button seeds
+  ranked on **table points**: a win by 6 points or more is worth 2 and docks the
+  loser 1, any closer win is worth 1 and the loser nothing, and a walkover pays
+  the narrow win. Players level on points are split head-to-head first, then on
+  point difference, then on points scored. When every group match has a result, one button seeds
   the top *n* of each group into a knockout tree — 16 qualifiers walk into the
   round of 16, 8 into the quarters, and so on. The seeding keeps two players
   from the same group out of each other's first match, and with two qualifying

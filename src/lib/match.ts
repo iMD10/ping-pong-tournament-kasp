@@ -50,6 +50,32 @@ export function seriesWinner(round: Round, games: Game[]): 1 | 2 | null {
   return null;
 }
 
+export type MatchStatus = "live" | "upcoming" | "finished";
+
+/** Where a match stands right now: on the table, still to come, or done. A bye
+ * and a walkover count as done — they carry a result, they just weren't
+ * played. */
+export function matchStatus(
+  match: Pick<Match, "is_live" | "winner_id" | "outcome_type">
+): MatchStatus {
+  if (match.winner_id || match.outcome_type !== "pending") return "finished";
+  return match.is_live ? "live" : "upcoming";
+}
+
+/** Orders what hasn't been played the way a fixture list reads: the next
+ * kickoff on top, and whatever has no time yet after it, in board order. */
+export function byKickoff(fallback: (a: Match, b: Match) => number) {
+  return (a: Match, b: Match) => {
+    if (a.scheduled_at && b.scheduled_at) return a.scheduled_at.localeCompare(b.scheduled_at);
+    if (a.scheduled_at) return -1;
+    if (b.scheduled_at) return 1;
+    return fallback(a, b);
+  };
+}
+
+/** Most recent result first — the way a results list is read. */
+export const byMostRecent = (a: Match, b: Match) => b.updated_at.localeCompare(a.updated_at);
+
 /** Did «ما لك كليجا» fire anywhere in this match (any game won to zero)? */
 export function matchHasMalKKleeja(match: Pick<Match, "games">): boolean {
   return match.games.some((g) => isMalKKleeja(g.score1, g.score2));

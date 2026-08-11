@@ -98,10 +98,12 @@ create table if not exists statements (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   quote text not null,
+  player_id uuid references players(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
 create index if not exists idx_statements_created on statements (created_at);
+create index if not exists idx_statements_player on statements (player_id);
 
 -- ---------------------------------------------------------------------------
 -- draw_slots — the live draw («القرعة على الهواء»).

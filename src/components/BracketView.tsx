@@ -10,10 +10,14 @@ import { MatchCard } from "@/components/MatchCard";
 import { ProjectedBracket } from "@/components/ProjectedBracket";
 import { TreeNode } from "@/components/TreeNode";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
+import { isTournamentToday } from "@/lib/time";
 import type { Dict } from "@/lib/i18n/dictionary";
 
 type ViewMode = "groups" | "tree" | "list";
-type StatusFilter = "all" | "live" | "upcoming" | "finished";
+type MatchStatus = "live" | "upcoming" | "finished";
+// "today" cuts across the other three: a match on today's card can be any of
+// them, so it filters on the schedule rather than on the match's state.
+type StatusFilter = "all" | "today" | MatchStatus;
 
 const ROUND_ORDER: Round[] = ["G", "R1", "R16", "QF", "SF", "F"];
 
@@ -81,7 +85,7 @@ export function BracketView({
     [allMatches]
   );
 
-  const classify = (m: Match): StatusFilter => {
+  const classify = (m: Match): MatchStatus => {
     if (m.is_live) return "live";
     if (m.winner_id || m.outcome_type !== "pending") return "finished";
     return "upcoming";
@@ -94,9 +98,15 @@ export function BracketView({
     (a.group_no ?? 0) - (b.group_no ?? 0) ||
     a.bracket_slot - b.bracket_slot;
 
+  const matchesStatus = (m: Match) => {
+    if (status === "all") return true;
+    if (status === "today") return isTournamentToday(m.scheduled_at);
+    return classify(m) === status;
+  };
+
   const filtered = allMatches
     .filter((m) => tab === "all" || m.round === tab)
-    .filter((m) => status === "all" || classify(m) === status)
+    .filter(matchesStatus)
     .filter((m) => m.player1_id || m.player2_id || tab !== "all")
     .sort(byBracketOrder);
 
@@ -113,7 +123,10 @@ export function BracketView({
     .filter((m) => classify(m) === "finished")
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 
-  const feed = tab === "all" && status === "all" ? [...live, ...upcoming, ...finished] : filtered;
+  // Today's card reads best the same way the full feed does — what's on now,
+  // then what's next, then what's already done.
+  const grouped = tab === "all" && (status === "all" || status === "today");
+  const feed = grouped ? [...live, ...upcoming, ...finished] : filtered;
 
   // Before the qualifiers are seeded there is no tree to be empty about. The
   // list has the group matches to fall back on, so an empty one there is just
@@ -236,7 +249,7 @@ export function BracketView({
           </div>
 
           <div className="flex flex-wrap justify-center gap-2">
-            {(["all", "live", "upcoming", "finished"] as StatusFilter[]).map((s) => (
+            {(["all", "today", "live", "upcoming", "finished"] as StatusFilter[]).map((s) => (
               <button
                 key={s}
                 onClick={() => setStatus(s)}
@@ -252,7 +265,7 @@ export function BracketView({
           <div className="grid gap-3 sm:grid-cols-2">
             {feed.length === 0 && (
               <div className="liquid-glass-panel col-span-full rounded-2xl px-6 py-12 text-center text-sm text-fg/70">
-                {t.bracket.nothingHere}
+                {status === "today" ? t.bracket.noneToday : t.bracket.nothingHere}
               </div>
             )}
             {feed.map((m) => (

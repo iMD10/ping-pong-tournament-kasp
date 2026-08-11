@@ -105,11 +105,26 @@ export function roundRobinPairs(members: string[]): [string, string][] {
   return out;
 }
 
+/** A win by this much or more is worth double and costs the loser a point. */
+export const BIG_WIN_MARGIN = 6;
+
+/**
+ * What one group result is worth to each side, read off the margin: win by 6
+ * or more and it's 2 for the winner and -1 for the loser; anything closer is 1
+ * and nothing. A walkover has no margin to measure, so it pays the narrow win —
+ * the loser gave the win away, they didn't get beaten by six.
+ */
+export function groupPointsForMargin(margin: number): { winner: number; loser: number } {
+  return margin >= BIG_WIN_MARGIN ? { winner: 2, loser: -1 } : { winner: 1, loser: 0 };
+}
+
 export interface GroupStanding {
   playerId: string;
   played: number;
   wins: number;
   losses: number;
+  /** Table points from the margin rule — what the group is ranked on. */
+  points: number;
   pointsFor: number;
   pointsAgainst: number;
   pointDiff: number;
@@ -135,17 +150,27 @@ function headToHeadWins(players: string[], groupMatches: Match[]): Map<string, n
 /**
  * The table for one group.
  *
- * Ranking is wins first. Players level on wins are then split by their head-
- * to-head record against each other (whoever won that match ranks above),
- * and only players still level after that fall back to points — difference,
- * then points scored. A walkover still counts as a win and a loss; it just
- * brings no points with it.
+ * Ranking is table points first — 2 for a win by six or more, 1 for anything
+ * closer, and -1 charged to whoever lost by six. Players level on points are
+ * then split by their head-to-head record against each other (whoever won that
+ * match ranks above), and only players still level after that fall back to
+ * scored points — difference, then points scored. A walkover still counts as a
+ * win and a loss; it just brings no scored points with it.
  */
 export function computeStandings(members: string[], groupMatches: Match[]): GroupStanding[] {
   const table = new Map<string, GroupStanding>(
     members.map((id) => [
       id,
-      { playerId: id, played: 0, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, pointDiff: 0 },
+      {
+        playerId: id,
+        played: 0,
+        wins: 0,
+        losses: 0,
+        points: 0,
+        pointsFor: 0,
+        pointsAgainst: 0,
+        pointDiff: 0,
+      },
     ])
   );
 
@@ -154,18 +179,25 @@ export function computeStandings(members: string[], groupMatches: Match[]): Grou
     const loserId = m.winner_id === m.player1_id ? m.player2_id : m.player1_id;
     const winner = table.get(m.winner_id);
     const loser = table.get(loserId);
+
+    const scored = m.outcome_type === "score" && m.games.length > 0;
+    const p1 = scored ? totalPointsFor(m.games, 1) : 0;
+    const p2 = scored ? totalPointsFor(m.games, 2) : 0;
+    const margin = scored ? Math.abs(p1 - p2) : 0;
+    const award = groupPointsForMargin(margin);
+
     if (winner) {
       winner.played += 1;
       winner.wins += 1;
+      winner.points += award.winner;
     }
     if (loser) {
       loser.played += 1;
       loser.losses += 1;
+      loser.points += award.loser;
     }
 
-    if (m.outcome_type === "score" && m.games.length > 0) {
-      const p1 = totalPointsFor(m.games, 1);
-      const p2 = totalPointsFor(m.games, 2);
+    if (scored) {
       const s1 = table.get(m.player1_id);
       const s2 = table.get(m.player2_id);
       if (s1) {
@@ -182,12 +214,12 @@ export function computeStandings(members: string[], groupMatches: Match[]): Grou
   const rows = [...table.values()];
   for (const row of rows) row.pointDiff = row.pointsFor - row.pointsAgainst;
 
-  const byWins = [...rows].sort((a, b) => b.wins - a.wins);
+  const byPoints = [...rows].sort((a, b) => b.points - a.points);
   const ranked: GroupStanding[] = [];
-  for (let i = 0; i < byWins.length; ) {
+  for (let i = 0; i < byPoints.length; ) {
     let j = i + 1;
-    while (j < byWins.length && byWins[j].wins === byWins[i].wins) j++;
-    const tied = byWins.slice(i, j);
+    while (j < byPoints.length && byPoints[j].points === byPoints[i].points) j++;
+    const tied = byPoints.slice(i, j);
     if (tied.length > 1) {
       const h2h = headToHeadWins(
         tied.map((row) => row.playerId),
@@ -209,6 +241,7 @@ export function computeStandings(members: string[], groupMatches: Match[]): Grou
 /** True when two rows are level on everything the ranking looks at. */
 export function isTiedWith(a: GroupStanding, b: GroupStanding): boolean {
   return (
+    a.points === b.points &&
     a.wins === b.wins &&
     a.losses === b.losses &&
     a.pointDiff === b.pointDiff &&

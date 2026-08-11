@@ -1,10 +1,10 @@
 import type { Game, Match, Round } from "@/lib/supabase/types";
 import { isMalKKleeja } from "@/lib/validation";
 
-/** Semifinal and final are best of 3 (first to 2 games); group matches and every
- * earlier knockout round are a single game. */
+/** Every knockout round is best of 3 (first to 2 games). A group match is a
+ * single game to 11, and the judge exhibition is a one-off outside the tree. */
 export function gamesToWin(round: Round): number {
-  return round === "SF" || round === "F" ? 2 : 1;
+  return round === "G" || round === "judge" ? 1 : 2;
 }
 
 /** Winner of a single game (1 | 2 | null if still 10-10 with no decider recorded). */
@@ -37,7 +37,7 @@ export function seriesWinner(round: Round, games: Game[]): 1 | 2 | null {
   return null;
 }
 
-/** Did «ما لك كليجا» fire anywhere in this match (any game ending exactly 11-0)? */
+/** Did «ما لك كليجا» fire anywhere in this match (any game won to zero)? */
 export function matchHasMalKKleeja(match: Pick<Match, "games">): boolean {
   return match.games.some((g) => isMalKKleeja(g.score1, g.score2));
 }

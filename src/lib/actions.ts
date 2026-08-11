@@ -14,7 +14,7 @@ import {
   validateGroupSplit,
 } from "@/lib/groups";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
-import { validateDeciderScore, validateGameScore } from "@/lib/validation";
+import { validateDeciderScore, validateDoublePointUse, validateGameScore } from "@/lib/validation";
 import type { Game, Match, Round } from "@/lib/supabase/types";
 
 type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };
@@ -690,6 +690,9 @@ export async function recordGameResult(
   }
 
   const games = [...(match.games as Game[]), game];
+  const doublePoint = validateDoublePointUse(games);
+  if (!doublePoint.valid) return { ok: false, error: doublePoint.error };
+
   const winner = seriesWinner(match.round as Round, games);
   const winnerId = winner === 1 ? match.player1_id : winner === 2 ? match.player2_id : null;
 
@@ -827,6 +830,21 @@ export async function editResult(
   const { data: match, error } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (error || !match) return { ok: false, error: "المباراة ما فيه لها وجود" };
 
+  // A correction goes through the same rulebook as the original entry.
+  for (const g of games) {
+    const outcome = validateGameScore(g.score1, g.score2);
+    if (!outcome.valid) return { ok: false, error: outcome.error };
+    if (outcome.needsDecider) {
+      if (g.decider_score1 == null || g.decider_score2 == null) {
+        return { ok: false, error: "النتيجة 10-10, أدخل نتيجة الديسايدر" };
+      }
+      const dec = validateDeciderScore(g.decider_score1, g.decider_score2);
+      if (!dec.valid) return { ok: false, error: dec.error };
+    }
+  }
+  const doublePoint = validateDoublePointUse(games);
+  if (!doublePoint.valid) return { ok: false, error: doublePoint.error };
+
   const winnerChanged = match.winner_id !== winnerId;
 
   const { error: updErr } = await supabase
@@ -928,7 +946,7 @@ export async function setBestShamat(name: string, quote: string): Promise<Action
 // Statements — quotes scrolled across the hall of fame page
 // ---------------------------------------------------------------------------
 
-export async function addStatement(name: string, quote: string): Promise<ActionResult> {
+export async function addStatement(name: string, quote: string, playerId?: string | null): Promise<ActionResult> {
   const supabase = await requireAdmin();
   const cleanName = name.trim().replace(/\s+/g, " ");
   const cleanQuote = quote.trim().replace(/\s+/g, " ");
@@ -937,7 +955,9 @@ export async function addStatement(name: string, quote: string): Promise<ActionR
   if (cleanName.length > 60) return { ok: false, error: "الاسم طويل، خلّه أقصر" };
   if (cleanQuote.length > 200) return { ok: false, error: "التصريح طويل، اختصره" };
 
-  const { error } = await supabase.from("statements").insert({ name: cleanName, quote: cleanQuote });
+  const { error } = await supabase
+    .from("statements")
+    .insert({ name: cleanName, quote: cleanQuote, player_id: playerId || null });
   if (error) return { ok: false, error: error.message };
 
   revalidatePath("/", "layout");

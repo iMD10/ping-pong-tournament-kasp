@@ -403,6 +403,10 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
             <input type="number" value={s2} onChange={(e) => setS2(e.target.value)} placeholder="0" className={inputCls} />
           </div>
 
+          <p className="text-center text-[11px] leading-relaxed text-fg/55">
+            11 مقابل 0–10، أو 12 إذا خلص الشوط بالنقطة المضاعفة، أو 10-10 للديسايدر
+          </p>
+
           {needsDecider && (
             <div className="flex items-center justify-center gap-2">
               <span className="text-xs text-fg/70">ديسايدر</span>

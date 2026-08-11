@@ -20,6 +20,7 @@ export function NavBar({ lang, nav, brand }: { lang: Lang; nav: Dict["nav"]; bra
     { href: "/bracket", label: nav.bracket },
     { href: "/draw", label: nav.draw },
     { href: "/players", label: nav.players },
+    { href: "/statements", label: nav.statements },
     { href: "/rules", label: nav.rules },
     { href: "/prize", label: nav.prize },
     { href: "/hall", label: nav.hall },

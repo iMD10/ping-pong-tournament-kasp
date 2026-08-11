@@ -181,10 +181,10 @@ export const ROUND_ORDER: Record<Round, number> = { judge: -1, G: 0, R1: 1, R16:
 /**
  * Everyone still level after a metric *and* a tie-break.
  *
- * Match records need this because the scoring rules cap them: a shutout is
- * 11-0 and every single-game round tops out there, so a plain maximum leaves
- * a dozen matches level and the array order — which is bracket order — picks
- * the winner. Breaking on the round means the same 11-0 counts for more in a
+ * Match records need this because the scoring rules cap them: a shutout is a
+ * win to zero and no game can go past 12, so a plain maximum leaves a dozen
+ * matches level and the array order — which is bracket order — picks the
+ * winner. Breaking on the round means the same shutout counts for more in a
  * quarterfinal than in a group, and whatever is still tied after that is
  * genuinely tied.
  */

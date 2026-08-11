@@ -65,11 +65,14 @@ export interface DrawSlot {
   created_at: string;
 }
 
-/** A quote from a player or spectator, typed in by the admin. */
+/** A quote from a player or spectator, typed in by the admin. player_id links
+ * it back to a roster player when the admin picked one; null for spectators
+ * or anyone typed in by hand. */
 export interface Statement {
   id: string;
   name: string;
   quote: string;
+  player_id: string | null;
   created_at: string;
 }
 
@@ -94,7 +97,7 @@ export interface Database {
       };
       statements: {
         Row: Statement;
-        Insert: Partial<Statement> & { name: string; quote: string };
+        Insert: Partial<Omit<Statement, "player_id">> & { name: string; quote: string; player_id?: string | null };
         Update: Partial<Statement>;
       };
       draw_slots: {

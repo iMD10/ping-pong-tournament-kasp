@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { getMatches, getPlayers, playerName } from "@/lib/data";
+import { Quote } from "lucide-react";
+import { getMatches, getPlayers, getStatements, playerName } from "@/lib/data";
 import { computeStats } from "@/lib/stats";
 import { MatchCard } from "@/components/MatchCard";
 import { PageShell } from "@/components/PageShell";
@@ -9,7 +10,7 @@ import { getLang, getT } from "@/lib/i18n/server";
 export const revalidate = 0;
 
 export default async function PlayerDetailPage({ params }: { params: { id: string } }) {
-  const [players, matches] = await Promise.all([getPlayers(), getMatches()]);
+  const [players, matches, statements] = await Promise.all([getPlayers(), getMatches(), getStatements()]);
   const player = players.find((p) => p.id === params.id);
   if (!player) notFound();
 
@@ -19,6 +20,9 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
   const playerMatches = matches
     .filter((m) => m.player1_id === player.id || m.player2_id === player.id)
     .sort((a, b) => a.bracket_slot - b.bracket_slot);
+  const playerStatements = statements
+    .filter((s) => s.player_id === player.id)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   return (
     <PageShell title={player.name}>
@@ -48,6 +52,27 @@ export default async function PlayerDetailPage({ params }: { params: { id: strin
           <MatchCard key={m.id} match={m} players={players} t={t} locale={locale} />
         ))}
       </div>
+
+      {playerStatements.length > 0 && (
+        <>
+          <h2 className="mb-4 mt-8 text-lg font-medium tracking-tight text-fg/90">
+            {t.players.statementsTitle}
+          </h2>
+          <ul className="flex flex-col gap-3">
+            {playerStatements.map((s) => (
+              <li
+                key={s.id}
+                className="liquid-glass-panel flex items-start gap-3 rounded-2xl px-4 py-3.5"
+              >
+                <Quote size={16} className="mt-1 shrink-0 text-accent" />
+                <p dir="auto" className="text-sm leading-relaxed text-fg/85">
+                  {s.quote}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </PageShell>
   );
 }

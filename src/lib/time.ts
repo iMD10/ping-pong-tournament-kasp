@@ -75,6 +75,19 @@ export function scheduleInputToISO(value: string): string | null {
   return new Date(ts).toISOString();
 }
 
+/**
+ * Whether an instant falls on today's date — "today" being the day the hall is
+ * living in, not the day the viewer's device happens to be on.
+ */
+export function isTournamentToday(iso: string | null): boolean {
+  if (!iso) return false;
+  const ts = Date.parse(iso);
+  if (Number.isNaN(ts)) return false;
+  const day = zonedParts(ts, TOURNAMENT_TIME_ZONE);
+  const now = zonedParts(Date.now(), TOURNAMENT_TIME_ZONE);
+  return day.year === now.year && day.month === now.month && day.day === now.day;
+}
+
 /** Match date + time for display, always on the tournament's clock. */
 export function formatMatchTime(iso: string, locale: string): string {
   const ts = Date.parse(iso);

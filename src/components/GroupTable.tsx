@@ -9,9 +9,9 @@ function signed(n: number): string {
 }
 
 /**
- * One group's table. Rows are already ranked by `computeStandings` — wins
- * first, point difference only as a tie-break — and the qualifying places are
- * marked as long as the group is still deciding them.
+ * One group's table. Rows are already ranked by `computeStandings` — table
+ * points first, scored points only as a tie-break — and the qualifying places
+ * are marked as long as the group is still deciding them.
  */
 export function GroupTable({
   group,
@@ -51,7 +51,7 @@ export function GroupTable({
       </div>
 
       <div className="thin-scroll overflow-x-auto">
-        <table className="w-full min-w-[22rem] border-collapse text-sm">
+        <table className="w-full min-w-[24rem] border-collapse text-sm">
           <thead>
             <tr className="text-[11px] uppercase tracking-wide text-fg/55">
               <th className="w-8 px-2 py-2 text-center font-normal">#</th>
@@ -61,6 +61,7 @@ export function GroupTable({
               <th className="w-9 px-1 py-2 text-center font-normal">{t.groups.losses}</th>
               <th className="w-12 px-1 py-2 text-center font-normal">{t.groups.diff}</th>
               <th className="w-10 px-1 py-2 text-center font-normal">{t.groups.pointsFor}</th>
+              <th className="w-10 px-1 py-2 text-center font-normal text-fg/70">{t.groups.points}</th>
             </tr>
           </thead>
           <tbody>
@@ -91,10 +92,11 @@ export function GroupTable({
                   </div>
                 </td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/55">{row.played}</td>
-                <td className="px-1 py-2.5 text-center font-semibold tabular-nums text-fg">{row.wins}</td>
+                <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{row.wins}</td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{row.losses}</td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{signed(row.pointDiff)}</td>
                 <td className="px-1 py-2.5 text-center tabular-nums text-fg/55">{row.pointsFor}</td>
+                <td className="px-1 py-2.5 text-center font-semibold tabular-nums text-fg">{row.points}</td>
               </tr>
             ))}
           </tbody>

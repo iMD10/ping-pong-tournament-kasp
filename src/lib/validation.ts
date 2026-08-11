@@ -1,5 +1,7 @@
 // The rulebook, encoded. See SPEC.md §2.
 
+import { ltr } from "@/lib/format";
+
 export type GameOutcome =
   | { valid: false; error: string }
   | { valid: true; needsDecider: boolean; winner: 1 | 2 | null; mercy: boolean };
@@ -50,7 +52,11 @@ export function validateGameScore(score1: number, score2: number): GameOutcome {
 
   return {
     valid: false,
-    error: `نتيجة غير صحيحة (${score1}-${score2}). المسموح: 11-x (x من 0 إلى 10)، أو 12-x (x من 0 إلى 9) إذا خلص الشوط بالنقطة المضاعفة، أو 10-10 لفتح الديسايدر.`,
+    // The typed pair is echoed in the order it was typed — this one is a
+    // mirror of the input box, not a result to read winner-first.
+    error: `نتيجة غير صحيحة (${ltr(`${score1}-${score2}`)}). المسموح: ${ltr("11-x")} (x من 0 إلى 10)، أو ${ltr(
+      "12-x"
+    )} (x من 0 إلى 9) إذا خلص الشوط بالنقطة المضاعفة، أو ${ltr("10-10")} لفتح الديسايدر.`,
   };
 }
 
@@ -94,7 +100,9 @@ export function validateDeciderScore(score1: number, score2: number): DeciderOut
   if (diff !== 2 || winnerScore < 2) {
     return {
       valid: false,
-      error: `نتيجة الديسايدر غير صحيحة (${score1}-${score2}). لازم فرق نقطتين بالضبط، مثل 2-0 أو 3-1 أو 4-2.`,
+      error: `نتيجة الديسايدر غير صحيحة (${ltr(`${score1}-${score2}`)}). لازم فرق نقطتين بالضبط، مثل ${ltr(
+        "2-0"
+      )} أو ${ltr("3-1")} أو ${ltr("4-2")}.`,
     };
   }
   return { valid: true, winner: score1 > score2 ? 1 : 2 };

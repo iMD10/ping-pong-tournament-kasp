@@ -5,6 +5,7 @@ import { PageShell } from "@/components/PageShell";
 import { StatsTable, SummaryStrip } from "@/components/StatsTable";
 import { KleejaIcon } from "@/components/KleejaIcon";
 import { getT } from "@/lib/i18n/server";
+import { scorePair } from "@/lib/format";
 import { isMalKKleeja } from "@/lib/validation";
 import type { Match, Player } from "@/lib/supabase/types";
 import type { ReactNode } from "react";
@@ -178,7 +179,10 @@ export default async function HallPage() {
           }
           note={
             longestDecider
-              ? `${t.match.decider} ${longestDecider.game.decider_score1}-${longestDecider.game.decider_score2} · ${
+              ? `${t.match.decider} ${scorePair(
+                  longestDecider.game.decider_score1!,
+                  longestDecider.game.decider_score2!
+                )} · ${
                   t.rounds[longestDecider.match.round]
                 }`
               : undefined

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Radio, Pencil, CalendarClock, UserX, Users, RotateCcw, X } from "lucide-react";
 import type { Match, Player } from "@/lib/supabase/types";
 import { groupLabel } from "@/lib/groups";
+import { ltr } from "@/lib/format";
 import { formatScoreLine, gameWinCounts, gamesToWin, ROUND_LABELS_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
 import { formatMatchTime, scheduleInputToISO, toScheduleInputValue } from "@/lib/time";
@@ -232,8 +233,19 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
         <span className={`min-w-0 flex-1 truncate text-sm ${match.winner_id === match.player1_id ? "font-semibold text-fg" : "text-fg/70"}`}>
           {p1Name || "؟؟؟"}
         </span>
-        <span className="shrink-0 text-xs tabular-nums text-fg/70">
-          {need > 1 ? `${p1Wins}–${p2Wins}` : "VS"}
+        {/* Laid out as a flex row rather than one string: each count then sits
+            on its own player's side of the dash in both directions, instead of
+            being reordered around it by the bidi algorithm. */}
+        <span className="flex shrink-0 items-center gap-1 text-xs tabular-nums text-fg/70">
+          {need > 1 ? (
+            <>
+              <span>{p1Wins}</span>
+              <span className="text-fg/40">–</span>
+              <span>{p2Wins}</span>
+            </>
+          ) : (
+            "VS"
+          )}
         </span>
         <span className={`min-w-0 flex-1 truncate text-end text-sm ${match.winner_id === match.player2_id ? "font-semibold text-fg" : "text-fg/70"}`}>
           {p2Name || "؟؟؟"}
@@ -404,7 +416,7 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
           </div>
 
           <p className="text-center text-[11px] leading-relaxed text-fg/55">
-            11 مقابل 0–10، أو 12 إذا خلص الشوط بالنقطة المضاعفة، أو 10-10 للديسايدر
+            11 مقابل {ltr("0–10")}، أو 12 إذا خلص الشوط بالنقطة المضاعفة، أو {ltr("10-10")} للديسايدر
           </p>
 
           {needsDecider && (

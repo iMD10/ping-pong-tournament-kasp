@@ -1,4 +1,5 @@
 import type { Game, Match, Round } from "@/lib/supabase/types";
+import { scorePair } from "@/lib/format";
 import { isMalKKleeja } from "@/lib/validation";
 
 /** Every knockout round is best of 3 (first to 2 games). A group match is a
@@ -51,10 +52,12 @@ export function totalPointsFor(games: Game[], side: 1 | 2): number {
   }, 0);
 }
 
+/** One game as a line of text — winner's number first, so it reads the way the
+ * result is spoken. See `scorePair` for why the pair is held left-to-right. */
 export function formatScoreLine(game: Game): string {
-  const main = `${game.score1}-${game.score2}`;
+  const main = scorePair(game.score1, game.score2);
   if (game.score1 === 10 && game.score2 === 10 && game.decider_score1 != null) {
-    return `${main} (ديسايدر ${game.decider_score1}-${game.decider_score2})`;
+    return `${main} (ديسايدر ${scorePair(game.decider_score1, game.decider_score2 ?? 0)})`;
   }
   return main;
 }

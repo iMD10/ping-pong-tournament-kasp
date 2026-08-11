@@ -18,6 +18,7 @@ export function NavBar({ lang, nav, brand }: { lang: Lang; nav: Dict["nav"]; bra
   const links = [
     { href: "/", label: nav.home },
     { href: "/bracket", label: nav.bracket },
+    { href: "/matches", label: nav.matches },
     { href: "/draw", label: nav.draw },
     { href: "/players", label: nav.players },
     { href: "/statements", label: nav.statements },

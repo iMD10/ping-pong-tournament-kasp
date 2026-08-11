@@ -1,22 +1,35 @@
-import { getJudgeMatch, getMatches, getPlayers, getState } from "@/lib/data";
+import { getMatches, getPlayers, getState } from "@/lib/data";
 import { BracketView } from "@/components/BracketView";
-import { MatchCard } from "@/components/MatchCard";
 import { OnAirBanner } from "@/components/OnAirBanner";
 import { LiveWatch } from "@/components/LiveWatch";
+import { ViewSwitcher } from "@/components/ViewSwitcher";
 import { EmptyState, PageShell } from "@/components/PageShell";
 import { getLang, getT } from "@/lib/i18n/server";
 
 export const revalidate = 0;
 
-export default async function BracketPage() {
-  const [matches, players, judgeMatch, state] = await Promise.all([
-    getMatches(),
-    getPlayers(),
-    getJudgeMatch(),
-    getState(),
-  ]);
+export default async function BracketPage({
+  searchParams,
+}: {
+  searchParams: { view?: string };
+}) {
+  const [matches, players, state] = await Promise.all([getMatches(), getPlayers(), getState()]);
   const t = getT();
   const locale = getLang() === "ar" ? "ar-SA" : "en-GB";
+
+  const hasGroups = matches.some((m) => m.round === "G");
+  const knockoutStarted = matches.some((m) => m.round !== "G");
+
+  // The URL decides, so a link lands on the view it promised. A ?view= that
+  // this tournament has no shape for falls back to the stage being played.
+  const view: "groups" | "tree" =
+    searchParams.view === "groups" && hasGroups
+      ? "groups"
+      : searchParams.view === "tree"
+        ? "tree"
+        : hasGroups && !knockoutStarted
+          ? "groups"
+          : "tree";
 
   return (
     <PageShell title={t.bracket.title} subtitle={t.bracket.subtitle} badge={t.brand} wide>
@@ -32,25 +45,17 @@ export default async function BracketPage() {
           <LiveWatch tables={["tournament_state", "matches"]} />
         </>
       ) : (
-        <BracketView
-          matches={matches}
-          players={players}
-          advancePerGroup={state?.advance_per_group ?? 2}
-          t={t}
-          locale={locale}
-        />
-      )}
-
-      {/* The champion-vs-referee exhibition lives outside the tree, so it gets
-          its own section instead of a node in the bracket. */}
-      {judgeMatch && (
-        <section className="mt-10">
-          <h2 className="text-lg font-medium tracking-tight text-fg/90">{t.match.exhibition}</h2>
-          <p className="mb-4 mt-1 text-sm text-fg/70">{t.match.exhibitionNote}</p>
-          <div className="sm:max-w-md">
-            <MatchCard match={judgeMatch} players={players} t={t} locale={locale} />
-          </div>
-        </section>
+        <div className="flex flex-col gap-5">
+          <ViewSwitcher active={view} hasGroups={hasGroups} t={t} />
+          <BracketView
+            matches={matches}
+            players={players}
+            advancePerGroup={state?.advance_per_group ?? 2}
+            view={view}
+            t={t}
+            locale={locale}
+          />
+        </div>
       )}
     </PageShell>
   );

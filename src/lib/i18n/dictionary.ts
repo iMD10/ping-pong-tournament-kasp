@@ -6,6 +6,7 @@ export const dict = {
     nav: {
       home: "الرئيسية",
       bracket: "مسار البطولة",
+      matches: "المباريات",
       draw: "القرعة",
       players: "اللاعبون",
       statements: "التصريحات",
@@ -18,6 +19,7 @@ export const dict = {
       title2: "الطيّب مب نافعك هنا",
       lede: "بطولة ما أحد طلب منا نسويها, وصارت أهم شي بالبرنامج",
       ctaBracket: "شف مسار البطولة",
+      ctaMatches: "شف المباريات",
       ctaRules: "القوانين",
       playingNow: "تلعب الآن",
       upcoming: "المباريات القادمة",
@@ -32,8 +34,9 @@ export const dict = {
       title: "مسار البطولة",
       subtitle: "كل المباريات من الجولة الأولى إلى النهائي. تتحدث مباشرة مع كل نتيجة.",
       empty: "القرعة ما بعد انسحبت، ما به مسار نعرضه.",
-      tree: "مسار البطولة",
-      list: "القائمة",
+      // Not "مسار البطولة" — that's the page title and the nav item, so as a
+      // tab label it reads like the page you're already on.
+      tree: "الإقصائيات",
       all: "الكل",
       today: "اليوم",
       live: "مباشر",
@@ -41,6 +44,10 @@ export const dict = {
       finished: "انتهت",
       nothingHere: "ما به شي هنا",
       noneToday: "ما به مباريات اليوم",
+    },
+    matches: {
+      title: "المباريات",
+      subtitle: "كل مباريات البطولة، من المجموعات إلى النهائي. مباشر، قادم، وانتهى.",
     },
     groups: {
       tab: "المجموعات",
@@ -196,6 +203,7 @@ export const dict = {
     nav: {
       home: "Home",
       bracket: "Bracket",
+      matches: "Matches",
       draw: "Draw",
       players: "Players",
       statements: "Statements",
@@ -208,6 +216,7 @@ export const dict = {
       title2: "one champion",
       lede: "The table tennis tournament for KAUST Academy AI program students. Follow the bracket, live scores, and everyone who got knocked out, as it happens.",
       ctaBracket: "View bracket",
+      ctaMatches: "View matches",
       ctaRules: "Rules",
       playingNow: "Playing now",
       upcoming: "Upcoming matches",
@@ -223,7 +232,6 @@ export const dict = {
       subtitle: "Every match from round one to the final. Updates live with each result.",
       empty: "The draw hasn't happened yet, there's no bracket to show.",
       tree: "Tree",
-      list: "List",
       all: "All",
       today: "Today",
       live: "Live",
@@ -231,6 +239,10 @@ export const dict = {
       finished: "Finished",
       nothingHere: "Nothing here",
       noneToday: "No matches scheduled today",
+    },
+    matches: {
+      title: "Matches",
+      subtitle: "Every match in the tournament, groups through the final. Live, upcoming, and finished.",
     },
     groups: {
       tab: "Groups",

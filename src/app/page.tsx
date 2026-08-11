@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getJudgeMatch, getMatches, getPlayers, getState, getStatements, playerName } from "@/lib/data";
 import { MatchCard } from "@/components/MatchCard";
 import { StatementsTicker } from "@/components/StatementsTicker";
@@ -66,18 +67,21 @@ export default async function HomePage() {
           <StatementsTicker statements={statements} title={t.home.statements} />
         </div>
 
+        {/* Once there's a card to read, the match list is what people came for;
+            before the draw, the bracket page is the only thing to see. */}
         <BottomLeftCard
           count={players.length}
           label={t.nav.players}
-          ctaLabel={t.home.ctaBracket}
-          ctaHref="/bracket"
+          ctaLabel={state?.drawn ? t.home.ctaMatches : t.home.ctaBracket}
+          ctaHref={state?.drawn ? "/matches" : "/bracket"}
         />
 
         {live ? (
           <BottomRightCorner
             title={t.home.playingNow}
             subtitle={`${playerName(players, live.player1_id)} vs ${playerName(players, live.player2_id)}`}
-            href="/bracket"
+            // The live score is in the feed, not in the tree.
+            href="/matches"
           />
         ) : (
           <BottomRightCorner title={''} subtitle={t.home.ctaRules} href="/rules" />
@@ -96,7 +100,13 @@ export default async function HomePage() {
           )
         ) : upcoming.length > 0 ? (
           <>
-            <h2 className="mb-5 text-lg font-medium tracking-tight text-fg/90">{t.home.upcoming}</h2>
+            <div className="mb-5 flex items-baseline justify-between gap-4">
+              <h2 className="text-lg font-medium tracking-tight text-fg/90">{t.home.upcoming}</h2>
+              {/* Only the next four fit here — the rest of the card is a click away. */}
+              <Link href="/matches" className="shrink-0 text-sm text-accent hover:underline">
+                {t.home.ctaMatches}
+              </Link>
+            </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {upcoming.map((m) => (
                 <MatchCard key={m.id} match={m} players={players} t={t} locale={locale} />

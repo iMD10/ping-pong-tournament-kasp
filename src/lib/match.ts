@@ -1,10 +1,23 @@
 import type { Game, Match, Round } from "@/lib/supabase/types";
 import { isMalKKleeja } from "@/lib/validation";
 
-/** Every knockout round is best of 3 (first to 2 games). A group match is a
- * single game to 11, and the judge exhibition is a one-off outside the tree. */
+/** How many games a round's series is played to. The knockout gets longer the
+ * deeper it runs: the round of 16 and the quarterfinals are best of 3 (first to
+ * 2), the semifinals best of 5 (first to 3), and the final best of 7 (first to
+ * 4). A group match is a single game to 11, and the judge exhibition is a
+ * one-off outside the tree. */
 export function gamesToWin(round: Round): number {
-  return round === "G" || round === "judge" ? 1 : 2;
+  switch (round) {
+    case "G":
+    case "judge":
+      return 1;
+    case "SF":
+      return 3;
+    case "F":
+      return 4;
+    default:
+      return 2;
+  }
 }
 
 /** Winner of a single game (1 | 2 | null if still 10-10 with no decider recorded). */
@@ -51,14 +64,6 @@ export function totalPointsFor(games: Game[], side: 1 | 2): number {
   }, 0);
 }
 
-export function formatScoreLine(game: Game): string {
-  const main = `${game.score1}-${game.score2}`;
-  if (game.score1 === 10 && game.score2 === 10 && game.decider_score1 != null) {
-    return `${main} (ديسايدر ${game.decider_score1}-${game.decider_score2})`;
-  }
-  return main;
-}
-
 export const ROUND_LABELS_AR: Record<Round, string> = {
   G: "دور المجموعات",
   R1: "الجولة الأولى",
@@ -67,6 +72,13 @@ export const ROUND_LABELS_AR: Record<Round, string> = {
   SF: "نصف النهائي",
   F: "النهائي",
   judge: "مباراة القاضي",
+};
+
+/** The series format spelled out, keyed by how many game wins it takes. */
+export const SERIES_FORMAT_AR: Record<number, string> = {
+  2: "أفضل من ثلاث، أول من يفوز بشوطين",
+  3: "أفضل من خمس، أول من يفوز بثلاثة أشواط",
+  4: "أفضل من سبع، أول من يفوز بأربعة أشواط",
 };
 
 export const ROUND_LABELS_EN: Record<Round, string> = {

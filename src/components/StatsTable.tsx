@@ -2,6 +2,9 @@ import Link from "next/link";
 import type { RankedStats } from "@/lib/stats";
 import type { Dict } from "@/lib/i18n/dictionary";
 
+/** A lone + or − is a neutral character, so an Arabic page hangs it off the
+ * wrong end of the digits and +5 reads as 5+. Every cell showing one is pinned
+ * to ltr; being centred, it looks the same in both languages. */
 function signed(n: number): string {
   return n > 0 ? `+${n}` : String(n);
 }
@@ -81,7 +84,9 @@ export function StatsTable({
                   <td className="hidden px-1 py-2.5 text-center tabular-nums text-fg/70 sm:table-cell">
                     {row.played > 0 ? `${Math.round(row.winRate * 100)}%` : "–"}
                   </td>
-                  <td className="px-1 py-2.5 text-center tabular-nums text-fg/70">{signed(row.pointDiff)}</td>
+                  <td dir="ltr" className="px-1 py-2.5 text-center tabular-nums text-fg/70">
+                    {signed(row.pointDiff)}
+                  </td>
                   <td className="hidden px-1 py-2.5 text-center tabular-nums text-fg/55 sm:table-cell">
                     {row.pointsFor}
                   </td>

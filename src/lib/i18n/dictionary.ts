@@ -157,7 +157,7 @@ export const dict = {
       awards: "الألقاب",
       // كل لقب يشرح نفسه: القاعدة اللي انحسب فيها، عشان ما يصير كلام ما له أساس.
       hints: {
-        malKleeja: "كل شوط انتهى 11-0 أو 12-0",
+        malKleeja: "كل شوط انتهى 11-0",
         blowout: "أكبر فرق نقاط بمباراة كاملة، وإذا تعادلوا الدور الأبعد يفوز",
         deciderSurvivor: "أكثر لاعب فاز بمباراة راحت ديسايدر",
         longestDecider: "الديسايدر اللي طوّل أكثر من غيره",
@@ -176,7 +176,9 @@ export const dict = {
       withdrew: "انسحب",
       decider: "ديسايدر",
       malKleeja: "ما لك كليجا",
-      bestOf3: "أفضل من ثلاث، أول من يفوز بمبارتين",
+      bestOf3: "أفضل من ثلاث، أول من يفوز بشوطين",
+      bestOf5: "أفضل من خمس، أول من يفوز بثلاثة أشواط",
+      bestOf7: "أفضل من سبع، أول من يفوز بأربعة أشواط",
       exhibition: "مباراة استعراضية",
       exhibitionNote: "بطل البطولة ضد الحكم، للتسلية بس. خارج المسار وما تحسب في الإحصائيات.",
     },
@@ -353,7 +355,7 @@ export const dict = {
       // Each award states the rule it was computed from, so nothing reads as
       // an opinion the page can't back up.
       hints: {
-        malKleeja: "Every game that ended 11-0 or 12-0",
+        malKleeja: "Every game that ended 11-0",
         blowout: "Biggest point gap across a whole match; a tie goes to the later round",
         deciderSurvivor: "Most matches won after going to a decider",
         longestDecider: "The decider that ran longest",
@@ -373,6 +375,8 @@ export const dict = {
       decider: "Decider",
       malKleeja: "No Kleeja For You",
       bestOf3: "Best of 3, first to win 2 games",
+      bestOf5: "Best of 5, first to win 3 games",
+      bestOf7: "Best of 7, first to win 4 games",
       exhibition: "Exhibition match",
       exhibitionNote: "The champion against the referee, just for fun. Outside the bracket and not counted in the stats.",
     },
@@ -410,11 +414,11 @@ export const RULES: Record<Lang, string[]> = {
     "الإرسال بالأدوار الإقصائية: لازم إرسال قانوني — ترمي الكرة ثم تضربها.",
     "ثلاث إرسالات متتالية تلمس الشبكة (نت) تُحتسب نقطة للخصم.",
     "بدور المجموعات: كل واحد يلعب مع كل من بمجموعته، وكل مباراة شوط واحد إلى 11 نقطة.",
-    "بالأدوار الإقصائية: الأفضل من 3 أشواط، وكل شوط إلى 11 نقطة، والفايز بشوطين يتأهل.",
+    "بالأدوار الإقصائية: كل شوط إلى 11 نقطة، ويطول المسلسل كل ما قربنا من الكأس — دور الـ16 وربع النهائي الأفضل من 3 أشواط (الفايز بشوطين يتأهل)، ونصف النهائي الأفضل من 5 (الفايز بثلاثة)، والنهائي الأفضل من 7 (الفايز بأربعة).",
     "النتيجة الصحيحة للشوط: 11 مقابل أي رقم من 0 إلى 10، أو 12 مقابل 0 إلى 9 إذا خلص الشوط بالنقطة المضاعفة. ما به توقف مبكر، كل شوط يكمل لين 11.",
     "نقاط المجموعات: الفوز بفارق أقل من 6 نقاط = نقطة وحدة للفايز وصفر للخاسر. والفوز بفارق 6 نقاط أو أكثر = نقطتين للفايز وتنخصم نقطة من الخاسر.",
     "ترتيب المجموعة بنقاط المجموعات. وإذا تعادل لاعبان بالنقاط، تفصل بينهم المواجهة المباشرة، ثم فرق النقاط، ثم النقاط اللي سجلها.",
-    "من يخسر شوط 11-0 أو 12-0 ياخذ وسام «ما لك كليجا».",
+    "من يخسر شوط 11-0 ياخذ وسام «ما لك كليجا».",
     "الحكم الرسمي للبطولة هو عبدالله الهليس، وهو المسؤول عن هذي القوانين وقراراته بشأنها نهائية، وهو سيلعب ايضا مباراة خاصة مع الفايو بالبطولة.",
   ],
   en: [
@@ -425,11 +429,11 @@ export const RULES: Record<Lang, string[]> = {
     "Serving in the knockout: a legal serve only — toss the ball, then hit it.",
     "Three serves in a row that clip the net hand a point to your opponent.",
     "Group stage: everyone plays everyone in their group, and every match is a single game to 11.",
-    "Knockout: best of 3, every game to 11, and the first to win two games advances.",
+    "Knockout: every game is to 11, and the series gets longer the closer the cup is — the round of 16 and the quarterfinals are best of 3 (first to two advances), the semifinals best of 5 (first to three), and the final best of 7 (first to four).",
     "A valid game score is 11 against any number from 0 to 10, or 12 against 0 to 9 when the declared double point finished it. There is no early stop, every game runs to 11.",
     "Group points: winning by less than 6 is worth 1 point to the winner and nothing to the loser. Winning by 6 or more is worth 2, and the loser is docked 1.",
     "Group tables are ranked on group points. If two players are level, their head-to-head separates them, then point difference, then points scored.",
-    "Losing a game 11-0 or 12-0 earns you the «No Kleeja For You» badge.",
+    "Losing a game 11-0 earns you the «No Kleeja For You» badge.",
     "The tournament's official referee is Abdullah Al-Helais. He's responsible for these rules, his rulings on them are final, and he's the one who crowns the tournament winner.",
   ],
 };

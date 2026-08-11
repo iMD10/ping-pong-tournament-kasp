@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Radio, Pencil, CalendarClock, UserX, Users, RotateCcw, X } from "lucide-react";
 import type { Match, Player } from "@/lib/supabase/types";
 import { groupLabel } from "@/lib/groups";
-import { formatScoreLine, gameWinCounts, gamesToWin, ROUND_LABELS_AR } from "@/lib/match";
+import { gameWinCounts, gamesToWin, ROUND_LABELS_AR, SERIES_FORMAT_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
+import { ScorePair } from "@/components/ScorePair";
 import { formatMatchTime, scheduleInputToISO, toScheduleInputValue } from "@/lib/time";
 import {
   clearResult,
@@ -57,8 +58,8 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
   const p2Name = playerName(players, match.player2_id);
   const canScore = !!(match.player1_id && match.player2_id) && !match.winner_id && match.outcome_type === "pending";
   const canEdit = !!match.winner_id && match.outcome_type === "score";
-  // Anything the admin typed can be taken back: a finished score, a half-played
-  // best-of-three, or a walkover called too early. A bye is not typed, it
+  // Anything the admin typed can be taken back: a finished score, a series
+  // stopped halfway, or a walkover called too early. A bye is not typed, it
   // follows from the placement, so it is undone over in the players editor.
   const canReset =
     match.games.length > 0 || match.outcome_type === "absent" || match.outcome_type === "withdrew";
@@ -232,8 +233,8 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
         <span className={`min-w-0 flex-1 truncate text-sm ${match.winner_id === match.player1_id ? "font-semibold text-fg" : "text-fg/70"}`}>
           {p1Name || "؟؟؟"}
         </span>
-        <span className="shrink-0 text-xs tabular-nums text-fg/70">
-          {need > 1 ? `${p1Wins}–${p2Wins}` : "VS"}
+        <span className="shrink-0 text-xs text-fg/70">
+          {need > 1 ? <ScorePair score1={p1Wins} score2={p2Wins} /> : "VS"}
         </span>
         <span className={`min-w-0 flex-1 truncate text-end text-sm ${match.winner_id === match.player2_id ? "font-semibold text-fg" : "text-fg/70"}`}>
           {p2Name || "؟؟؟"}
@@ -243,8 +244,17 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
       {match.games.length > 0 && (
         <div className="mt-2.5 flex flex-wrap justify-center gap-1.5">
           {match.games.map((g, i) => (
-            <span key={i} className="rounded-md bg-fg/10 px-2 py-1 font-mono text-xs tabular-nums text-fg/75">
-              {formatScoreLine(g)}
+            <span
+              key={i}
+              className="flex items-center gap-1.5 rounded-md bg-fg/10 px-2 py-1 font-mono text-xs text-fg/75"
+            >
+              <ScorePair score1={g.score1} score2={g.score2} />
+              {g.decider_score1 != null && g.decider_score2 != null && (
+                <span className="flex items-center gap-1 text-fg/55">
+                  <span className="font-sans">ديسايدر</span>
+                  <ScorePair score1={g.decider_score1} score2={g.decider_score2} />
+                </span>
+              )}
             </span>
           ))}
         </div>
@@ -258,7 +268,7 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
       )}
 
       {canScore && need > 1 && (
-        <p className="mt-2 text-center text-[12px] text-fg/70">أفضل من ثلاث، أول من يفوز بمبارتين</p>
+        <p className="mt-2 text-center text-[12px] text-fg/70">{SERIES_FORMAT_AR[need]}</p>
       )}
 
       {match.scheduled_at && (

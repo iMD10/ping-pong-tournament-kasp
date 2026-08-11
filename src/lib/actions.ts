@@ -887,7 +887,7 @@ export async function editResult(
 /**
  * Wipes a match back to "not played yet" — the escape hatch for a score typed
  * against a match that never happened, a walkover called too early, or a first
- * game of a best-of-three that went in wrong. Everything the old winner went on
+ * game of a series that went in wrong. Everything the old winner went on
  * to reach is voided with it, so the admin sees the damage first via
  * previewEditImpact.
  */

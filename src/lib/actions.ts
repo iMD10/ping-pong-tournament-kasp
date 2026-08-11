@@ -675,6 +675,17 @@ export async function recordGameResult(
   const { data: match, error: mErr } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (mErr || !match) return { ok: false, error: "المباراة ما فيه لها وجود" };
 
+  // A decided match takes no more games. The admin row already hides the button,
+  // but two tabs — or a second submit that beat the first one's refresh — would
+  // otherwise append a game the match never had room for. In the group stage
+  // that is silent damage: one game decides the match, so a stray second game
+  // still leaves the right winner standing while both scores land in the
+  // standings, and a 11-5 win that was worth 2 collapses to 1. Corrections go
+  // through عدّل, and a result typed against the wrong match through امسح النتيجة.
+  if (match.winner_id || match.outcome_type !== "pending") {
+    return { ok: false, error: "المباراة لها نتيجة، عدّلها أو امسحها أول" };
+  }
+
   const outcome = validateGameScore(score1, score2);
   if (!outcome.valid) return { ok: false, error: outcome.error };
 
@@ -728,6 +739,11 @@ export async function recordWalkover(
   const { data: match, error: mErr } = await supabase.from("matches").select("*").eq("id", matchId).single();
   if (mErr || !match) return { ok: false, error: "المباراة ما فيه لها وجود" };
   if (!match.player1_id || !match.player2_id) return { ok: false, error: "لازم اللاعبين معروفين أول" };
+  // Same rule as scoring: a match that has been played or already ruled on is
+  // not a walkover, and calling one would leave its games behind unread.
+  if (match.winner_id || match.outcome_type !== "pending") {
+    return { ok: false, error: "المباراة لها نتيجة، عدّلها أو امسحها أول" };
+  }
 
   const winnerId = match.player1_id === absentOrWithdrewPlayerId ? match.player2_id : match.player1_id;
 

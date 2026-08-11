@@ -85,6 +85,12 @@ alter table tournament_state add column if not exists format text not null defau
 alter table tournament_state add column if not exists group_count int;
 alter table tournament_state add column if not exists advance_per_group int;
 
+-- Qualifying places settled by hand, group number to an ordered list of player
+-- ids: { "0": ["<uuid>", "<uuid>"] }. A group only appears here when the admin
+-- picked its qualifiers themselves — the usual case for a decider played in the
+-- room and never written down as a match. Empty means the table decides.
+alter table tournament_state add column if not exists group_tiebreaks jsonb not null default '{}'::jsonb;
+
 alter table tournament_state drop constraint if exists valid_format;
 alter table tournament_state add constraint valid_format
   check (format in ('knockout','groups'));

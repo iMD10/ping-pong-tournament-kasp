@@ -62,12 +62,14 @@ export const dict = {
       points: "نقاط",
       qualified: "متأهل",
       qualifiedNote:
-        "الترتيب بنقاط المجموعة: الفوز بفارق 6 نقاط أو أكثر = نقطتين وخصم نقطة من الخاسر، والفوز بفارق أقل = نقطة وحدة. وإذا تعادلوا تفصل المواجهة المباشرة ثم فرق النقاط.",
+        "الترتيب بنقاط المجموعة: الفوز بفارق 6 نقاط أو أكثر = نقطتين وخصم نقطة من الخاسر، والفوز بفارق أقل = نقطة وحدة. وإذا تعادلوا تفصل المواجهة المباشرة ثم فرق النقاط، وإذا ظلوا متعادلين على خط التأهل تنلعب بينهم فاصلة ما تنحسب بالجدول.",
       matches: "مباريات المجموعة",
       progress: "انلعبت",
       complete: "المجموعة خلصت",
       knockoutPending: "الإقصائيات ما بدأت بعد. لسه دور المجموعات شغال.",
       tiedNote: "تعادل بالنقاط",
+      tieNeedsDecider: "تعادل — ينفصل بمباراة فاصلة",
+      pinnedNote: "محسوم بالفاصلة",
       projectedNote:
         "هذا المسار المتوقّع: المقاعد محجوزة لأصحاب المراكز، والأسماء تنزل مكانها أول ما تخلص المجموعة.",
       places: ["أول", "ثاني", "ثالث", "رابع"],
@@ -259,12 +261,14 @@ export const dict = {
       points: "PTS",
       qualified: "Qualified",
       qualifiedNote:
-        "Ranked on table points: a win by 6 or more is worth 2 and costs the loser 1, a closer win is worth 1. A tie is broken head-to-head, then on point difference.",
+        "Ranked on table points: a win by 6 or more is worth 2 and costs the loser 1, a closer win is worth 1. A tie is broken head-to-head, then on point difference; anyone still level on the qualifying line plays a decider, which doesn't count towards the table.",
       matches: "Group matches",
       progress: "played",
       complete: "Group complete",
       knockoutPending: "The knockout hasn't started yet, the groups are still being played.",
       tiedNote: "Level on points",
+      tieNeedsDecider: "Level — settled by a decider",
+      pinnedNote: "Decided on the table",
       projectedNote:
         "This is the projected path: the seats are held for group places, and a name drops in as soon as its group is done.",
       places: ["Winner", "Runner-up", "3rd", "4th"],

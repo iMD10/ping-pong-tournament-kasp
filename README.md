@@ -50,10 +50,13 @@ the login screen behind it is the second layer of protection.
 - `supabase/schema.sql` — full DB schema, RLS policies, realtime publication.
 - `supabase/group-stage-migration.sql` — just the group-stage columns, for a
   database created before that feature (already part of `schema.sql`).
+- `supabase/group-tiebreak-migration.sql` — just the hand-picked qualifiers
+  column, for a database created before that feature (also in `schema.sql`).
 - `src/lib/validation.ts` — the scoring rulebook (11-x, 11-0 shutout, 10-10 decider).
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
-- `src/lib/groups.ts` — group draw, round-robin fixtures, standings, and the
-  seeding that turns qualifiers into a knockout tree.
+- `src/lib/groups.ts` — group draw, round-robin fixtures, standings, the
+  hand-picked qualifiers that settle a tie, and the seeding that turns
+  qualifiers into a knockout tree.
 - `src/lib/match.ts` — series lengths per round (best of 3 / 5 / 7), «ما لك كليجا» detection.
 - `src/lib/time.ts` — the tournament clock: every match time is written and read
   in `Asia/Riyadh`, whatever zone the device or the server happens to be in.

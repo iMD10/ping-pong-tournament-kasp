@@ -15,7 +15,7 @@ import {
 } from "@/lib/groups";
 import { gameWinCounts, gamesToWin, seriesWinner } from "@/lib/match";
 import { validateDeciderScore, validateDoublePointUse, validateGameScore } from "@/lib/validation";
-import type { Game, Match, Round } from "@/lib/supabase/types";
+import type { Game, GroupTiebreaks, Match, Round } from "@/lib/supabase/types";
 
 type ActionResult<T = null> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -219,6 +219,7 @@ export async function resetTournament(): Promise<ActionResult> {
       format: "knockout",
       group_count: null,
       advance_per_group: null,
+      group_tiebreaks: {},
     })
     .eq("id", 1);
   revalidatePath("/", "layout");
@@ -278,6 +279,7 @@ async function persistGroups(
       format: "groups",
       group_count: groups.length,
       advance_per_group: advancePerGroup,
+      group_tiebreaks: {},
     })
     .eq("id", 1);
   if (stateErr) return { ok: false, error: stateErr.message };
@@ -326,6 +328,67 @@ export async function runManualGroupDraw(
 }
 
 /**
+ * Hand-picks who takes the qualifying places in one group, in order.
+ *
+ * Two players level on everything the table looks at usually settle it over a
+ * decider on the table, and that game is nobody's business to record: it isn't
+ * part of the round robin and its score would skew the standings it was played
+ * to break. So the admin writes down the outcome instead of the game — this is
+ * where that goes. Passing an empty `order` tears the pin up and hands the
+ * group back to its results.
+ *
+ * The pin only holds the qualifying places; whoever isn't in it keeps the
+ * ranking the results gave them.
+ */
+export async function setGroupTiebreak(groupNo: number, order: string[]): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+  const { data: state } = await supabase
+    .from("tournament_state")
+    .select("drawn, format, advance_per_group, group_tiebreaks")
+    .single();
+  if (!state?.drawn || state.format !== "groups") return { ok: false, error: "ما به دور مجموعات" };
+
+  const { data: matches, error: mErr } = await supabase.from("matches").select("*").neq("round", "judge");
+  if (mErr) return { ok: false, error: mErr.message };
+
+  const all = (matches ?? []) as Match[];
+  if (all.some((m) => m.round !== "G")) {
+    return { ok: false, error: "الأدوار الإقصائية انبنت، ما ينفع تغيّر المتأهلين الحين" };
+  }
+
+  const group = groupsFromMatches(all).find((g) => g.groupNo === groupNo);
+  if (!group) return { ok: false, error: "ما به مجموعة بهذا الرقم" };
+
+  const places = Math.min(state.advance_per_group ?? 2, group.members.length);
+  const current = (state.group_tiebreaks ?? {}) as GroupTiebreaks;
+  const next: GroupTiebreaks = { ...current };
+
+  if (order.length === 0) {
+    delete next[String(groupNo)];
+  } else {
+    if (order.length !== places) {
+      return { ok: false, error: `لازم تختار ${places} متأهلين بالضبط من المجموعة` };
+    }
+    if (new Set(order).size !== order.length) {
+      return { ok: false, error: "فيه لاعب مختار مرتين" };
+    }
+    if (order.some((id) => !group.members.includes(id))) {
+      return { ok: false, error: "فيه لاعب مو من هذي المجموعة" };
+    }
+    next[String(groupNo)] = order;
+  }
+
+  const { error } = await supabase
+    .from("tournament_state")
+    .update({ group_tiebreaks: next })
+    .eq("id", 1);
+  if (error) return { ok: false, error: error.message };
+
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/**
  * Closes the group stage and builds the knockout tree from the qualifiers.
  * Refuses while any group match is still open — a half-finished table would
  * seed the wrong people, and the tree can't be redrawn once it exists.
@@ -334,7 +397,7 @@ export async function buildKnockoutFromGroups(): Promise<ActionResult> {
   const supabase = await requireAdmin();
   const { data: state } = await supabase
     .from("tournament_state")
-    .select("drawn, format, advance_per_group")
+    .select("drawn, format, advance_per_group, group_tiebreaks")
     .single();
   if (!state?.drawn || state.format !== "groups") return { ok: false, error: "ما به دور مجموعات" };
 
@@ -346,7 +409,7 @@ export async function buildKnockoutFromGroups(): Promise<ActionResult> {
     return { ok: false, error: "الأدوار الإقصائية انبنت من قبل" };
   }
 
-  const groups = groupsFromMatches(all);
+  const groups = groupsFromMatches(all, (state.group_tiebreaks ?? {}) as GroupTiebreaks);
   if (groups.length === 0) return { ok: false, error: "ما به مباريات مجموعات" };
 
   const pending = groups.reduce((sum, g) => sum + (g.total - g.played), 0);

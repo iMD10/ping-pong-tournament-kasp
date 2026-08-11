@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Trophy } from "lucide-react";
-import type { Match, Player } from "@/lib/supabase/types";
+import type { GroupTiebreaks, Match, Player } from "@/lib/supabase/types";
 import { groupsFromMatches, projectKnockout } from "@/lib/groups";
 import { playerName } from "@/lib/players";
 import { GroupTable } from "@/components/GroupTable";
@@ -16,6 +16,7 @@ export function BracketView({
   matches: allMatches,
   players,
   advancePerGroup,
+  tiebreaks,
   view,
   t,
   locale,
@@ -23,6 +24,8 @@ export function BracketView({
   matches: Match[];
   players: Player[];
   advancePerGroup: number;
+  /** Qualifying places the admin settled by hand, where a group needed it. */
+  tiebreaks: GroupTiebreaks | null;
   // Which stage view to draw. Owned by the URL on the page above, so the view
   // survives a share, a bookmark and the back button.
   view: "groups" | "tree";
@@ -34,7 +37,7 @@ export function BracketView({
   // The group stage and the tree are two different shapes of the same table, so
   // the tables and the tree each get their own view. Every match in one flat
   // feed, group matches included, is its own page at /matches.
-  const groups = useMemo(() => groupsFromMatches(allMatches), [allMatches]);
+  const groups = useMemo(() => groupsFromMatches(allMatches, tiebreaks), [allMatches, tiebreaks]);
   const knockout = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
   const hasGroups = groups.length > 0;
   const knockoutStarted = knockout.length > 0;

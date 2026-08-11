@@ -6,6 +6,14 @@ export type DrawStatus = "idle" | "live" | "done";
 /** knockout = straight to the tree, groups = round-robin groups then the tree. */
 export type TournamentFormat = "knockout" | "groups";
 
+/**
+ * The qualifying places an admin settled by hand, group number to an ordered
+ * list of players — the result of a decider played in the room and never
+ * written down as a match. Group numbers arrive as jsonb object keys, so
+ * they're strings.
+ */
+export type GroupTiebreaks = Record<string, string[]>;
+
 export interface Player {
   id: string;
   name: string;
@@ -55,6 +63,9 @@ export interface TournamentState {
   /** Groups format only: how many groups, and how many of each qualify. */
   group_count: number | null;
   advance_per_group: number | null;
+  /** Qualifying places the admin picked by hand, group number to an ordered
+   * list of player ids. A group missing from here is ranked by its results. */
+  group_tiebreaks: GroupTiebreaks | null;
   updated_at: string;
 }
 

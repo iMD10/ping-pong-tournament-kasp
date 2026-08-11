@@ -51,6 +51,7 @@ export default async function BracketPage({
             matches={matches}
             players={players}
             advancePerGroup={state?.advance_per_group ?? 2}
+            tiebreaks={state?.group_tiebreaks ?? null}
             view={view}
             t={t}
             locale={locale}

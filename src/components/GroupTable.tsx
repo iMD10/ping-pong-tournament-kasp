@@ -1,6 +1,6 @@
 import { Check } from "lucide-react";
 import type { Player } from "@/lib/supabase/types";
-import { groupLabel, isTiedWith, type GroupStanding, type GroupView } from "@/lib/groups";
+import { groupLabel, tieOnQualifyingLine, type GroupView } from "@/lib/groups";
 import { playerName } from "@/lib/players";
 import type { Dict } from "@/lib/i18n/dictionary";
 
@@ -28,12 +28,16 @@ export function GroupTable({
   t: Dict;
 }) {
   const qualifies = (i: number) => i < advance;
-  // Two players who can't be separated on wins or points, straddling the
-  // qualifying line, is the one case the table can't settle by itself.
-  const tieOnTheLine = (row: GroupStanding, i: number): boolean => {
-    const neighbour = i === advance - 1 ? group.standings[i + 1] : i === advance ? group.standings[i - 1] : null;
-    return !!neighbour && isTiedWith(row, neighbour);
-  };
+  // Players the table can't separate across the qualifying line: level while
+  // the group is still running, and a decider waiting to be played once it
+  // isn't. A pin means that decider was played, so the note stands down.
+  const notes = new Map<string, string>();
+  if (group.pinned.length > 0) {
+    for (const id of group.pinned) notes.set(id, t.groups.pinnedNote);
+  } else {
+    const label = group.complete ? t.groups.tieNeedsDecider : t.groups.tiedNote;
+    for (const row of tieOnQualifyingLine(group.standings, advance)) notes.set(row.playerId, label);
+  }
 
   return (
     <div className="liquid-glass-panel overflow-hidden rounded-2xl">
@@ -89,8 +93,8 @@ export function GroupTable({
                     >
                       {playerName(players, row.playerId)}
                     </span>
-                    {!group.complete && tieOnTheLine(row, i) && (
-                      <span className="shrink-0 text-[11px] text-fg/45">{t.groups.tiedNote}</span>
+                    {notes.has(row.playerId) && (
+                      <span className="shrink-0 text-[11px] text-fg/45">{notes.get(row.playerId)}</span>
                     )}
                   </div>
                 </td>

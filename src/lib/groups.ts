@@ -1,6 +1,6 @@
 import { buildBracket, nextPowerOfTwo, roundCodeForDistance, type Pairing } from "@/lib/bracket";
 import { totalPointsFor } from "@/lib/match";
-import type { Match, Round } from "@/lib/supabase/types";
+import type { GroupTiebreaks, Match, Round } from "@/lib/supabase/types";
 
 /** A group any smaller than this is just a match with extra steps. */
 export const MIN_GROUP_SIZE = 3;
@@ -249,6 +249,68 @@ export function isTiedWith(a: GroupStanding, b: GroupStanding): boolean {
   );
 }
 
+/**
+ * The players a group cannot separate on the qualifying line: the run of rows
+ * level on everything the ranking looks at, with some of them inside the
+ * qualifying places and some outside. Comes back empty when the line falls
+ * cleanly — either nobody is level there, or the whole tied run is on one side
+ * of it and the order inside it doesn't decide anyone's tournament.
+ */
+export function tieOnQualifyingLine(standings: GroupStanding[], advance: number): GroupStanding[] {
+  if (advance < 1 || advance >= standings.length) return [];
+
+  const last = standings[advance - 1];
+  if (!isTiedWith(last, standings[advance])) return [];
+
+  let start = advance - 1;
+  while (start > 0 && isTiedWith(standings[start - 1], last)) start--;
+  let end = advance + 1;
+  while (end < standings.length && isTiedWith(standings[end], last)) end++;
+  return standings.slice(start, end);
+}
+
+/**
+ * The pinned order for one group, dropping anything that stopped making sense
+ * since it was saved (a player no longer in the group, a name listed twice).
+ * Reading it defensively keeps a stale pin from corrupting a table.
+ */
+export function pinnedOrder(
+  tiebreaks: GroupTiebreaks | null | undefined,
+  groupNo: number,
+  members: string[]
+): string[] {
+  const raw = tiebreaks?.[String(groupNo)];
+  if (!Array.isArray(raw)) return [];
+
+  const inGroup = new Set(members);
+  const out: string[] = [];
+  for (const id of raw) {
+    if (typeof id === "string" && inGroup.has(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
+/**
+ * Lifts the pinned players to the top of the table in the order the admin
+ * chose, leaving everyone else in the order the results put them. A pin only
+ * ever moves the qualifying places around; the rest of the table is still the
+ * table.
+ */
+export function applyPinnedOrder(standings: GroupStanding[], pinned: string[]): GroupStanding[] {
+  if (pinned.length === 0) return standings;
+
+  const byId = new Map(standings.map((row) => [row.playerId, row]));
+  const head: GroupStanding[] = [];
+  for (const id of pinned) {
+    const row = byId.get(id);
+    if (row) {
+      head.push(row);
+      byId.delete(id);
+    }
+  }
+  return [...head, ...standings.filter((row) => byId.has(row.playerId))];
+}
+
 export interface GroupView {
   groupNo: number;
   members: string[];
@@ -258,14 +320,19 @@ export interface GroupView {
   played: number;
   total: number;
   complete: boolean;
+  /** Places the admin pinned by hand, in order. Empty when the table decides. */
+  pinned: string[];
 }
 
 /**
  * Rebuilds the groups from the match rows themselves — the pairings are the
  * only record of who is in which group, and a full round robin puts every
  * member on at least one card.
+ *
+ * `tiebreaks` are the qualifying places the admin settled by hand; where a
+ * group has one, it overrides what the results ranked.
  */
-export function groupsFromMatches(matches: Match[]): GroupView[] {
+export function groupsFromMatches(matches: Match[], tiebreaks?: GroupTiebreaks | null): GroupView[] {
   const byGroup = new Map<number, Match[]>();
   for (const m of matches) {
     if (m.round !== "G" || m.group_no == null) continue;
@@ -285,14 +352,16 @@ export function groupsFromMatches(matches: Match[]): GroupView[] {
         }
       }
       const played = ordered.filter((m) => !!m.winner_id).length;
+      const pinned = pinnedOrder(tiebreaks, groupNo, members);
       return {
         groupNo,
         members,
         matches: ordered,
-        standings: computeStandings(members, ordered),
+        standings: applyPinnedOrder(computeStandings(members, ordered), pinned),
         played,
         total: ordered.length,
         complete: played === ordered.length,
+        pinned,
       };
     });
 }

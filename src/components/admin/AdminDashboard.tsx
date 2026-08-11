@@ -121,6 +121,7 @@ export function AdminDashboard({
           matches={matches}
           players={players}
           advancePerGroup={state.advance_per_group ?? 2}
+          tiebreaks={state.group_tiebreaks ?? null}
           knockoutStarted={knockoutStarted}
         />
       )}

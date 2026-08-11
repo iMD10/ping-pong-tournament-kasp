@@ -2,28 +2,32 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Trophy } from "lucide-react";
+import { AlertTriangle, Trophy } from "lucide-react";
 import { buildKnockoutFromGroups } from "@/lib/actions";
-import { entryRoundCode, groupLabel, groupsFromMatches } from "@/lib/groups";
+import { entryRoundCode, groupLabel, groupsFromMatches, tieOnQualifyingLine } from "@/lib/groups";
 import { ROUND_LABELS_AR } from "@/lib/match";
 import { playerName } from "@/lib/players";
 import { getDict } from "@/lib/i18n/dictionary";
 import { GroupTable } from "@/components/GroupTable";
-import type { Match, Player } from "@/lib/supabase/types";
+import { GroupQualifiersPicker } from "@/components/admin/GroupQualifiersPicker";
+import type { GroupTiebreaks, Match, Player } from "@/lib/supabase/types";
 
 /**
- * The group stage as the admin sees it: live tables, and the one button that
- * closes the stage and seeds the qualifiers into the tree.
+ * The group stage as the admin sees it: live tables, the hand-picked qualifiers
+ * for any group a decider had to settle, and the one button that closes the
+ * stage and seeds those qualifiers into the tree.
  */
 export function GroupsPanel({
   matches,
   players,
   advancePerGroup,
+  tiebreaks,
   knockoutStarted,
 }: {
   matches: Match[];
   players: Player[];
   advancePerGroup: number;
+  tiebreaks: GroupTiebreaks | null;
   knockoutStarted: boolean;
 }) {
   const router = useRouter();
@@ -32,11 +36,18 @@ export function GroupsPanel({
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const groups = useMemo(() => groupsFromMatches(matches), [matches]);
+  const groups = useMemo(() => groupsFromMatches(matches, tiebreaks), [matches, tiebreaks]);
   if (groups.length === 0) return null;
 
   const remaining = groups.reduce((sum, g) => sum + (g.total - g.played), 0);
   const qualifiers = groups.flatMap((g) => g.standings.slice(0, advancePerGroup));
+  // Groups that finished level across the qualifying line and haven't been
+  // settled: building now would seed whoever the fallback happened to rank
+  // first, which is exactly the coin flip the decider exists to replace.
+  const undecided = groups.filter(
+    (g) =>
+      g.complete && g.pinned.length === 0 && tieOnQualifyingLine(g.standings, advancePerGroup).length > 0
+  );
 
   const build = () => {
     setError(null);
@@ -57,15 +68,21 @@ export function GroupsPanel({
         </span>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid items-start gap-3 lg:grid-cols-2">
         {groups.map((group) => (
-          <GroupTable
-            key={group.groupNo}
-            group={group}
-            players={players}
-            advance={advancePerGroup}
-            t={t}
-          />
+          <div key={group.groupNo} className="flex flex-col gap-2">
+            <GroupTable group={group} players={players} advance={advancePerGroup} t={t} />
+            {!knockoutStarted && (
+              // Remount on every saved pin so the selects reopen on what was
+              // actually stored, not on the picks that produced it.
+              <GroupQualifiersPicker
+                key={group.pinned.join(",")}
+                group={group}
+                players={players}
+                advance={advancePerGroup}
+              />
+            )}
+          </div>
         ))}
       </div>
 
@@ -82,6 +99,14 @@ export function GroupsPanel({
           </p>
         ) : confirming ? (
           <>
+            {undecided.length > 0 && (
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-live">
+                <AlertTriangle size={14} className="mt-px shrink-0" />
+                فيه تعادل على خط التأهل بـ
+                {undecided.map((g) => ` المجموعة ${groupLabel(g.groupNo)}`).join("،")} وما انحسم. لو
+                بنيت الحين بيتأهل اللي فوق بالجدول — الأفضل تلعبون فاصلة وتختار المتأهل فوق.
+              </p>
+            )}
             <p className="text-sm text-fg/70">
               المتأهلون ({qualifiers.length}) بينزلون{" "}
               <span className="font-medium text-fg">
@@ -98,6 +123,9 @@ export function GroupsPanel({
                       {i + 1}
                     </span>{" "}
                     <span className="text-fg">{playerName(players, row.playerId)}</span>
+                    {group.pinned.includes(row.playerId) && (
+                      <span className="text-accent"> (بالفاصلة)</span>
+                    )}
                   </li>
                 ))
               )}
@@ -128,8 +156,8 @@ export function GroupsPanel({
               ابنِ الأدوار الإقصائية
             </button>
             <p className="text-xs leading-relaxed text-fg/70">
-              ياخذ أول {advancePerGroup} من كل مجموعة ويحطهم بالشجرة. ما ينبني إلا مرة وحدة، فراجع
-              الجداول قبلها.
+              ياخذ أول {advancePerGroup} من كل مجموعة — أو اللي اخترتهم بنفسك فوق — ويحطهم بالشجرة.
+              ما ينبني إلا مرة وحدة، فراجع الجداول قبلها.
             </p>
           </>
         )}

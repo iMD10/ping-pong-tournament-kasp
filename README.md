@@ -88,6 +88,12 @@ so results are worth checking before pressing the button.
 
 ## 7. Fixing a match after the fact
 
+The match board on `/admin` shows what's on the table and what's still to play —
+the top of that queue is tagged **التالية** — and files everything already
+scored under **مباريات انتهت**, folded shut until you open it. The public list at
+`/matches` reads the same way: live and upcoming first, results behind
+**النتائج السابقة**. Either fold opens itself when there's nothing left to play.
+
 Every match card on `/admin` has **امسح النتيجة**, which puts the match back to
 "not played yet" — for a score typed against a match that never happened, a
 walkover called too early, or a wrong first game of a series. Before it

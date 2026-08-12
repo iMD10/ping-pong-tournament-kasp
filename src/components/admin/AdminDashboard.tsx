@@ -14,7 +14,9 @@ import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
 import { JudgeMatchPanel } from "@/components/admin/JudgeMatchPanel";
 import { ShamatPanel } from "@/components/admin/ShamatPanel";
 import { StatementsPanel } from "@/components/admin/StatementsPanel";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
+import { byKickoff, byMostRecent, matchStatus } from "@/lib/match";
 import type {
   DrawSlot,
   Match,
@@ -56,9 +58,17 @@ export function AdminDashboard({
   // and qualifier count mean the same thing in both.
   const groupSettings = useGroupSettings(players.length);
 
-  const sorted = [...matches].sort(
-    (a, b) => (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot
-  );
+  const byBoardOrder = (a: Match, b: Match) =>
+    (ROUND_RANK[a.round] ?? 9) - (ROUND_RANK[b.round] ?? 9) || a.bracket_slot - b.bracket_slot;
+
+  // The board the admin actually works on is what's on the table and what's
+  // next; everything already scored is filed behind a fold, newest on top, for
+  // the times a score has to be fixed after the fact.
+  const onTable = matches.filter((m) => matchStatus(m) === "live").sort(byBoardOrder);
+  const toPlay = matches.filter((m) => matchStatus(m) === "upcoming").sort(byKickoff(byBoardOrder));
+  const played = matches.filter((m) => matchStatus(m) === "finished").sort(byMostRecent);
+  // Nothing on the table means the top of the queue is the one to set up next.
+  const nextUpId = onTable.length === 0 ? toPlay[0]?.id : undefined;
 
   return (
     <div className="flex flex-col gap-5">
@@ -134,13 +144,34 @@ export function AdminDashboard({
       <JudgeMatchPanel championId={state?.champion_id ?? null} judgeMatch={judgeMatch} players={players} />
 
       {state?.drawn && (
-        <div>
-          <h2 className="mb-3 text-lg font-medium tracking-tight text-fg/90">المباريات</h2>
-          <div className="grid gap-3 lg:grid-cols-2">
-            {sorted.map((m) => (
-              <MatchAdminRow key={m.id} match={m} players={players} />
-            ))}
-          </div>
+        <div className="flex flex-col gap-3">
+          <h2 className="text-lg font-medium tracking-tight text-fg/90">المباريات</h2>
+
+          {onTable.length + toPlay.length === 0 ? (
+            <p className="liquid-glass-panel rounded-2xl px-6 py-10 text-center text-sm text-fg/70">
+              ما به مباريات باقية، كلها انتهت.
+            </p>
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {[...onTable, ...toPlay].map((m) => (
+                <MatchAdminRow key={m.id} match={m} players={players} nextUp={m.id === nextUpId} />
+              ))}
+            </div>
+          )}
+
+          {played.length > 0 && (
+            <CollapsibleSection
+              title="مباريات انتهت"
+              count={played.length}
+              defaultOpen={onTable.length + toPlay.length === 0}
+            >
+              <div className="grid gap-3 lg:grid-cols-2">
+                {played.map((m) => (
+                  <MatchAdminRow key={m.id} match={m} players={players} />
+                ))}
+              </div>
+            </CollapsibleSection>
+          )}
         </div>
       )}
     </div>

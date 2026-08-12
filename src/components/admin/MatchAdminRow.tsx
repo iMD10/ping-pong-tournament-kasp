@@ -25,7 +25,16 @@ const inputCls =
 const selectCls =
   "min-w-0 flex-1 rounded-lg bg-fg/[0.08] px-3 py-2 text-xs text-fg outline-none focus:bg-fg/[0.14] [color-scheme:dark]";
 
-export function MatchAdminRow({ match, players }: { match: Match; players: Player[] }) {
+export function MatchAdminRow({
+  match,
+  players,
+  nextUp = false,
+}: {
+  match: Match;
+  players: Player[];
+  /** First in the queue with nothing on the table — the one to set up next. */
+  nextUp?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -212,9 +221,14 @@ export function MatchAdminRow({ match, players }: { match: Match; players: Playe
   return (
     <div className={`liquid-glass-panel rounded-2xl p-4 ${match.is_live ? "glass-live" : ""}`}>
       <div className="mb-2.5 flex items-center justify-between">
-        <span className="text-[12px] uppercase tracking-wide text-fg/70">
+        <span className="flex items-center gap-2 text-[12px] uppercase tracking-wide text-fg/70">
           {ROUND_LABELS_AR[match.round]}
           {match.round === "G" && match.group_no != null && ` · ${groupLabel(match.group_no)}`}
+          {nextUp && (
+            <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+              التالية
+            </span>
+          )}
         </span>
         {canScore && (
           <button

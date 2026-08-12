@@ -44,6 +44,8 @@ export const dict = {
       finished: "انتهت",
       nothingHere: "ما به شي هنا",
       noneToday: "ما به مباريات اليوم",
+      results: "النتائج السابقة",
+      noneLeft: "ما به مباريات باقية، كلها انتهت",
     },
     matches: {
       title: "المباريات",
@@ -243,6 +245,8 @@ export const dict = {
       finished: "Finished",
       nothingHere: "Nothing here",
       noneToday: "No matches scheduled today",
+      results: "Previous results",
+      noneLeft: "No matches left, they're all played",
     },
     matches: {
       title: "Matches",

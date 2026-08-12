@@ -4,14 +4,15 @@ import { useState } from "react";
 import { Check } from "lucide-react";
 import type { Match, Player, Round } from "@/lib/supabase/types";
 import { MatchCard } from "@/components/MatchCard";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { useLiveRefresh } from "@/components/useLiveRefresh";
+import { byKickoff, byMostRecent, matchStatus } from "@/lib/match";
 import { isTournamentToday } from "@/lib/time";
 import type { Dict } from "@/lib/i18n/dictionary";
 
-type MatchStatus = "live" | "upcoming" | "finished";
 // "today" cuts across the other three: a match on today's card can be any of
 // them, so it filters on the schedule rather than on the match's state.
-type StatusFilter = "all" | "today" | MatchStatus;
+type StatusFilter = "all" | "today" | "live" | "upcoming" | "finished";
 
 const ROUND_ORDER: Round[] = ["G", "R1", "R16", "QF", "SF", "F"];
 
@@ -35,12 +36,6 @@ export function MatchList({
 
   const roundsPresent = ROUND_ORDER.filter((r) => allMatches.some((m) => m.round === r));
 
-  const classify = (m: Match): MatchStatus => {
-    if (m.is_live) return "live";
-    if (m.winner_id || m.outcome_type !== "pending") return "finished";
-    return "upcoming";
-  };
-
   // With both stages in one list, a raw slot number no longer orders anything:
   // group and knockout matches number themselves separately.
   const byBracketOrder = (a: Match, b: Match) =>
@@ -51,7 +46,7 @@ export function MatchList({
   const matchesStatus = (m: Match) => {
     if (status === "all") return true;
     if (status === "today") return isTournamentToday(m.scheduled_at);
-    return classify(m) === status;
+    return matchStatus(m) === status;
   };
 
   const filtered = allMatches
@@ -60,28 +55,29 @@ export function MatchList({
     .filter((m) => m.player1_id || m.player2_id || tab !== "all")
     .sort(byBracketOrder);
 
-  const live = filtered.filter((m) => classify(m) === "live");
-  const upcoming = filtered
-    .filter((m) => classify(m) === "upcoming")
-    .sort((a, b) => {
-      if (a.scheduled_at && b.scheduled_at) return a.scheduled_at.localeCompare(b.scheduled_at);
-      if (a.scheduled_at) return -1;
-      if (b.scheduled_at) return 1;
-      return byBracketOrder(a, b);
-    });
-  const finished = filtered
-    .filter((m) => classify(m) === "finished")
-    .sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const live = filtered.filter((m) => matchStatus(m) === "live");
+  const upcoming = filtered.filter((m) => matchStatus(m) === "upcoming").sort(byKickoff(byBracketOrder));
+  const finished = filtered.filter((m) => matchStatus(m) === "finished").sort(byMostRecent);
 
-  // Today's card reads best the same way the full feed does — what's on now,
-  // then what's next, then what's already done.
-  const grouped = tab === "all" && (status === "all" || status === "today");
-  const feed = grouped ? [...live, ...upcoming, ...finished] : filtered;
+  // What's on now and what's next is the page; what already happened waits
+  // behind a fold, the way a fixture list keeps its results. Asking for the
+  // finished filter is asking for the results, so there they lead instead.
+  const resultsLead = status === "finished";
+  const current = resultsLead ? [] : [...live, ...upcoming];
+  const emptyNote = status === "today" ? t.bracket.noneToday : t.bracket.nothingHere;
 
   const pill = (on: boolean) =>
     `shrink-0 rounded-full px-4 py-2.5 text-sm transition-colors ${
       on ? "bg-fg text-bg font-medium" : "liquid-glass text-fg/70 hover:text-fg"
     }`;
+
+  const cards = (list: Match[]) => (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {list.map((m) => (
+        <MatchCard key={m.id} match={m} players={players} t={t} locale={locale} />
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -91,7 +87,7 @@ export function MatchList({
         </button>
         {roundsPresent.map((r) => {
           const roundMatches = allMatches.filter((m) => m.round === r);
-          const allDone = roundMatches.every((m) => classify(m) === "finished");
+          const allDone = roundMatches.every((m) => matchStatus(m) === "finished");
           return (
             <button
               key={r}
@@ -120,16 +116,40 @@ export function MatchList({
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        {feed.length === 0 && (
-          <div className="liquid-glass-panel col-span-full rounded-2xl px-6 py-12 text-center text-sm text-fg/70">
-            {status === "today" ? t.bracket.noneToday : t.bracket.nothingHere}
-          </div>
-        )}
-        {feed.map((m) => (
-          <MatchCard key={m.id} match={m} players={players} t={t} locale={locale} />
-        ))}
-      </div>
+      {resultsLead ? (
+        finished.length > 0 ? (
+          cards(finished)
+        ) : (
+          <EmptyRow>{emptyNote}</EmptyRow>
+        )
+      ) : (
+        <>
+          {current.length > 0 ? (
+            cards(current)
+          ) : (
+            <EmptyRow>{finished.length > 0 ? t.bracket.noneLeft : emptyNote}</EmptyRow>
+          )}
+
+          {finished.length > 0 && (
+            <CollapsibleSection
+              title={t.bracket.results}
+              count={finished.length}
+              // Nothing above it to read means the results are the page.
+              defaultOpen={current.length === 0}
+            >
+              {cards(finished)}
+            </CollapsibleSection>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function EmptyRow({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="liquid-glass-panel rounded-2xl px-6 py-12 text-center text-sm text-fg/70">
+      {children}
     </div>
   );
 }

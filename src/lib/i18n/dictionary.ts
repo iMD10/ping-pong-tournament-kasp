@@ -145,7 +145,7 @@ export const dict = {
       claudeNote: "اشتراك في كلود للبطل، عشان الكليجا تخلص والذكاء الاصطناعي يبقى.",
       thirdPlace: "المركز الثالث",
       thirdPlaceNote:
-        "تنلعب بين خاسري نصف النهائي، أفضل من خمسة أشواط. ما لها جائزة، بس اسمك ينكتب ثالث البطولة.",
+        "تنلعب بين خاسري نصف النهائي، أفضل من ثلاثة أشواط. ما لها جائزة، بس اسمك ينكتب ثالث البطولة.",
     },
     hall: {
       title: "الألقاب والاحصائيات",
@@ -355,7 +355,7 @@ export const dict = {
       claudeNote: "A Claude subscription for the champion — the kleeja runs out, the AI doesn't.",
       thirdPlace: "Third place",
       thirdPlaceNote:
-        "Played between the two beaten semifinalists, best of 5. No prize on it, just your name down as third.",
+        "Played between the two beaten semifinalists, best of 3. No prize on it, just your name down as third.",
     },
     hall: {
       title: "Hall of Fame & Shame",
@@ -441,7 +441,7 @@ export const RULES: Record<Lang, string[]> = {
     "ثلاث إرسالات متتالية تلمس الشبكة (نت) تُحتسب نقطة للخصم.",
     "بدور المجموعات: كل واحد يلعب مع كل من بمجموعته، وكل مباراة شوط واحد إلى 11 نقطة.",
     "بالأدوار الإقصائية: كل شوط إلى 11 نقطة، ويطول المسلسل كل ما قربنا من الكأس — دور الـ16 وربع النهائي الأفضل من 3 أشواط (الفايز بشوطين يتأهل)، ونصف النهائي الأفضل من 5 (الفايز بثلاثة)، والنهائي الأفضل من 7 (الفايز بأربعة).",
-    "المركز الثالث ينلعب: خاسرا نصف النهائي يتقابلون بمباراة أفضل من 5 أشواط (الفايز بثلاثة ياخذ المركز الثالث). ما لها جائزة، لكنها مباراة رسمية وتنحسب بالإحصائيات مثل غيرها.",
+    "المركز الثالث ينلعب: خاسرا نصف النهائي يتقابلون بمباراة أفضل من 3 أشواط (الفايز بشوطين ياخذ المركز الثالث). ما لها جائزة، لكنها مباراة رسمية وتنحسب بالإحصائيات مثل غيرها.",
     "النتيجة الصحيحة للشوط: 11 مقابل أي رقم من 0 إلى 10، أو 12 مقابل 0 إلى 9 إذا خلص الشوط بالنقطة المضاعفة. ما به توقف مبكر، كل شوط يكمل لين 11.",
     "نقاط المجموعات: الفوز بفارق أقل من 6 نقاط = نقطة وحدة للفايز وصفر للخاسر. والفوز بفارق 6 نقاط أو أكثر = نقطتين للفايز وتنخصم نقطة من الخاسر.",
     "ترتيب المجموعة بنقاط المجموعات. وإذا تعادل لاعبان بالنقاط، تفصل بينهم المواجهة المباشرة، ثم فرق النقاط، ثم النقاط اللي سجلها.",
@@ -457,7 +457,7 @@ export const RULES: Record<Lang, string[]> = {
     "Three serves in a row that clip the net hand a point to your opponent.",
     "Group stage: everyone plays everyone in their group, and every match is a single game to 11.",
     "Knockout: every game is to 11, and the series gets longer the closer the cup is — the round of 16 and the quarterfinals are best of 3 (first to two advances), the semifinals best of 5 (first to three), and the final best of 7 (first to four).",
-    "Third place is played for: the two beaten semifinalists meet in a best of 5 (first to three takes third place). There's no prize on it, but it is a real match and it counts in the stats like any other.",
+    "Third place is played for: the two beaten semifinalists meet in a best of 3 (first to two takes third place). There's no prize on it, but it is a real match and it counts in the stats like any other.",
     "A valid game score is 11 against any number from 0 to 10, or 12 against 0 to 9 when the declared double point finished it. There is no early stop, every game runs to 11.",
     "Group points: winning by less than 6 is worth 1 point to the winner and nothing to the loser. Winning by 6 or more is worth 2, and the loser is docked 1.",
     "Group tables are ranked on group points. If two players are level, their head-to-head separates them, then point difference, then points scored.",

@@ -63,7 +63,7 @@ the login screen behind it is the second layer of protection.
   hand-picked qualifiers that settle a tie, and the seeding that turns
   qualifiers into a knockout tree.
 - `src/lib/match.ts` — series lengths per round (best of 3 / 5 / 7, and the
-  third-place match at best of 5), «ما لك كليجا» detection.
+  third-place match at best of 3), «ما لك كليجا» detection.
 - `src/lib/time.ts` — the tournament clock: every match time is written and read
   in `Asia/Riyadh`, whatever zone the device or the server happens to be in.
 - `src/lib/actions.ts` — all admin server actions (draw, scoring, edit/recompute, reset).
@@ -95,7 +95,7 @@ so results are worth checking before pressing the button.
 ### The third-place match
 
 Any tree deep enough to have semifinals is drawn with a third-place match
-(round `3P`, best of 5 — the same length as the semifinal that sent them there).
+(round `3P`, best of 3 — short, since it is played once both are already out).
 It hangs off the tree rather than sitting in it: nothing feeds it a winner, so
 its two slots are filled with whoever *lost* the semifinals, seated as each one
 is settled. The bracket page shows it as its own card under the tree, and it

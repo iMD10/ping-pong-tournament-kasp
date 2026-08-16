@@ -25,8 +25,8 @@ create table if not exists matches (
   player1_id uuid references players(id) on delete set null,
   player2_id uuid references players(id) on delete set null,
   -- Array of games: [{ score1, score2, decider_score1?, decider_score2? }, ...]
-  -- 'G' is a single game; 'R1'/'R16'/'QF' are best of 3, 'SF' and the
-  -- third-place match '3P' best of 5, and 'F' best of 7.
+  -- 'G' is a single game; 'R1'/'R16'/'QF' and the third-place match '3P' are
+  -- best of 3, 'SF' is best of 5, and 'F' best of 7.
   games jsonb not null default '[]'::jsonb,
   winner_id uuid references players(id) on delete set null,
   outcome_type text not null default 'pending', -- pending | score | absent | withdrew | bye
@@ -48,7 +48,7 @@ alter table matches add column if not exists group_no int;
 -- which didn't know about the group round or the third-place match.
 --
 -- '3P' is the third-place match: one row per tournament, played by the two
--- beaten semifinalists, best of 5. Nothing feeds it by next_match_id and it
+-- beaten semifinalists, best of 3. Nothing feeds it by next_match_id and it
 -- feeds nothing — it hangs off the tree, and its players are written by the
 -- app as each semifinal is settled.
 alter table matches drop constraint if exists valid_round;

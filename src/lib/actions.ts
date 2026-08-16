@@ -121,6 +121,25 @@ export async function removePlayer(id: string): Promise<ActionResult> {
 /** The instant and manual draws refuse to run underneath a live ceremony. */
 const LIVE_DRAW_BUSY = "فيه قرعة شغالة على الهواء. أنهها أو ألغها أول.";
 
+/**
+ * A database whose schema predates a round code — 'G' for the group stage, '3P'
+ * for the third-place match — still carries the old `valid_round` check, and
+ * the insert comes back as a bare Postgres constraint message that names
+ * nothing the admin can act on. Swap it for the fix.
+ */
+const STALE_ROUND_CONSTRAINT =
+  "قاعدة البيانات ما تقبل هذي الجولة — سكيمتها أقدم من الميزة. شغّل supabase/third-place-migration.sql بمحرر SQL في سوبابيس، وبعدها أعد المحاولة.";
+
+function matchInsertError(
+  error: { message?: string; details?: string | null } | null,
+  fallback: string
+): string {
+  if (!error) return fallback;
+  const text = `${error.message ?? ""} ${error.details ?? ""}`;
+  if (text.includes("valid_round")) return STALE_ROUND_CONSTRAINT;
+  return error.message ?? fallback;
+}
+
 /** Writes a freshly built bracket: the match rows, then their next-match links. */
 async function insertBracket(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
@@ -138,7 +157,7 @@ async function insertBracket(
   }));
 
   const { data: inserted, error: insErr } = await supabase.from("matches").insert(insertPayload).select("id");
-  if (insErr || !inserted) return { ok: false, error: insErr?.message ?? "فشل إنشاء الشجرة" };
+  if (insErr || !inserted) return { ok: false, error: matchInsertError(insErr, "فشل إنشاء الشجرة") };
 
   const idAt = (i: number) => inserted[i].id;
   const updates = draft
@@ -178,7 +197,7 @@ async function insertThirdPlaceMatch(
     outcome_type: "pending" as const,
     games: [] as Game[],
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: matchInsertError(error, "فشل إنشاء مباراة المركز الثالث") };
   return { ok: true, data: null };
 }
 
@@ -291,7 +310,7 @@ async function persistGroups(
       games: [] as Game[],
     }))
   );
-  if (insErr) return { ok: false, error: insErr.message };
+  if (insErr) return { ok: false, error: matchInsertError(insErr, "فشل إنشاء مباريات المجموعات") };
 
   const { error: stateErr } = await supabase
     .from("tournament_state")
@@ -1200,7 +1219,7 @@ export async function createJudgeMatch(championId: string, refereeName: string):
     outcome_type: "pending",
     games: [],
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: matchInsertError(error, "فشل إنشاء مباراة الحكم") };
 
   revalidatePath("/", "layout");
   return { ok: true, data: null };

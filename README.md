@@ -54,7 +54,9 @@ the login screen behind it is the second layer of protection.
   column, for a database created before that feature (also in `schema.sql`).
 - `supabase/third-place-migration.sql` — just the widened round constraint that
   lets the third-place match (`'3P'`) exist, for a database created before it
-  (also in `schema.sql`).
+  (also in `schema.sql`). It rewrites `valid_round` with every round code the
+  app uses, so it is also the fix for a `valid_round` violation on any other
+  round — see [Troubleshooting](#8-troubleshooting).
 - `src/lib/validation.ts` — the scoring rulebook (11-x, 11-0 shutout, 10-10 decider).
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
 - `src/lib/groups.ts` — group draw, round-robin fixtures, standings, the
@@ -131,7 +133,27 @@ the admin picker is 4:30 م on every phone in the hall and on the server-rendere
 homepage. Move the tournament to another city and that one constant is the only
 thing to change.
 
-## 8. Still open (see original spec)
+## 8. Troubleshooting
+
+**`new row for relation "matches" violates check constraint "valid_round"`**
+
+The database is older than the app: its `valid_round` check still lists the
+round codes that existed when the schema was first run, and the app is trying
+to write one added later — `'G'` for the group stage, `'3P'` for the
+third-place match. Nothing is wrong with the roster or the draw.
+
+Fix it once in **SQL Editor > New query** with
+[`supabase/third-place-migration.sql`](supabase/third-place-migration.sql),
+which widens the check to the full list the app uses
+(`'G','R1','R16','QF','SF','3P','F','judge'`), then retry the action. Re-running
+the whole of `supabase/schema.sql` does the same thing and is equally safe —
+every statement in it is idempotent.
+
+Note that each migration file rewrites `valid_round` with the *complete* list,
+not just the codes it introduces, so running an old migration after a newer one
+can't take a round code back off the database.
+
+## 9. Still open (see original spec)
 
 - The champion takes a box of kleeja and a Claude subscription; second place has
   no prize, and third place is a match rather than a prize. If a real 2nd/3rd

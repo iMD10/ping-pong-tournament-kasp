@@ -14,9 +14,13 @@
 -- ---------------------------------------------------------------------------
 alter table matches add column if not exists group_no int;
 
+-- The full list of round codes, not just the ones this migration introduces:
+-- the constraint is dropped and rewritten, so leaving a later feature's code
+-- out would take it away from a database that already has it. '3P' is the
+-- third-place match, added after the group stage.
 alter table matches drop constraint if exists valid_round;
 alter table matches add constraint valid_round
-  check (round in ('G','R1','R16','QF','SF','F','judge'));
+  check (round in ('G','R1','R16','QF','SF','3P','F','judge'));
 
 create index if not exists idx_matches_group on matches (group_no);
 

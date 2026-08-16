@@ -10,6 +10,9 @@
 -- losing semifinalists, seated as each semifinal is settled, and the series is
 -- best of 5 — the same length as the semifinal they just lost.
 
+-- The list below is every round code the app writes, so this file is also the
+-- fix for `violates check constraint "valid_round"` on any other round — a
+-- database created before the group stage rejects 'G' the same way.
 alter table matches drop constraint if exists valid_round;
 alter table matches add constraint valid_round
   check (round in ('G','R1','R16','QF','SF','3P','F','judge'));

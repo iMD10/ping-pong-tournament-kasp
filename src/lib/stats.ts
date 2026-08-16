@@ -91,10 +91,43 @@ export interface RankedStats extends PlayerStats {
   pointsPerGame: number;
 }
 
+/** First, second and third as the bracket settled them; null until it has. */
+export interface FinalPlaces {
+  first: string | null;
+  second: string | null;
+  third: string | null;
+}
+
+/**
+ * The places the tournament itself decided: the final's winner and its loser,
+ * then whoever won the third-place match.
+ *
+ * Nothing is seated until the final has a winner — while the tournament is
+ * still running there are no places to hand out, so the table stays a plain
+ * record table. A third-place match that was never created, or isn't finished,
+ * simply leaves the third seat open.
+ */
+export function finalPlaces(matches: Match[]): FinalPlaces {
+  const final = matches.find((m) => m.round === "F" && m.winner_id);
+  if (!final) return { first: null, second: null, third: null };
+  const bronze = matches.find((m) => m.round === "3P" && m.winner_id);
+  return {
+    first: final.winner_id,
+    second: final.winner_id === final.player1_id ? final.player2_id : final.player1_id,
+    third: bronze?.winner_id ?? null,
+  };
+}
+
 /**
  * The whole field in one table, ranked the way a group table is: wins first,
  * point difference and then points scored only as tie-breaks. Anyone who
  * hasn't played sinks to the bottom instead of sitting tied for first.
+ *
+ * Once the final is played the top three seats stop being a record at all:
+ * they are the places the bracket handed out, and they are pinned. The
+ * runner-up plays one match more than the third-place player and loses it,
+ * which is precisely what coming second means — read as a record it just looks
+ * like an extra defeat, and the table used to drop them to third for it.
  */
 export function rankStats(players: Player[], matches: Match[]): RankedStats[] {
   const stats = computeStats(players, matches);
@@ -118,11 +151,25 @@ export function rankStats(players: Player[], matches: Match[]): RankedStats[] {
       a.name.localeCompare(b.name)
   );
 
+  // The podium first, in the order the bracket settled it, then everyone else
+  // by record underneath.
+  const places = finalPlaces(matches);
+  const seatedIds = [places.first, places.second, places.third].filter(
+    (id, i, all): id is string => id != null && all.indexOf(id) === i
+  );
+  const seated = seatedIds
+    .map((id) => rows.find((r) => r.playerId === id))
+    .filter((r): r is RankedStats => r != null);
+  const ordered = seated.length > 0 ? [...seated, ...rows.filter((r) => !seated.includes(r))] : rows;
+
   // Players the table genuinely can't separate share a rank, so a two-way tie
-  // for first doesn't render as a first and a second.
-  rows.forEach((row, i) => {
-    const above = rows[i - 1];
+  // for first doesn't render as a first and a second. A seated place is never
+  // shared: it was won, not tied for, so the comparison starts below the
+  // podium.
+  ordered.forEach((row, i) => {
+    const above = ordered[i - 1];
     const level =
+      i > seated.length &&
       above &&
       above.wins === row.wins &&
       above.pointDiff === row.pointDiff &&
@@ -130,7 +177,7 @@ export function rankStats(players: Player[], matches: Match[]): RankedStats[] {
     row.rank = level ? above.rank : i + 1;
   });
 
-  return rows;
+  return ordered;
 }
 
 /**

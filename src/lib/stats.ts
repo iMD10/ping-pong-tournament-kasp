@@ -49,8 +49,9 @@ export function computeStats(players: Player[], matches: Match[]): Map<string, P
       loserStats.losses += 1;
       loserStats.played += 1;
       // Losing a group match costs you nothing but the win column; only a
-      // knockout defeat actually ends the run.
-      if (m.round !== "G") loserStats.eliminatedBy = m.winner_id;
+      // knockout defeat actually ends the run. The third-place match is played
+      // by two people already knocked out, so it isn't what ended either run.
+      if (m.round !== "G" && m.round !== "3P") loserStats.eliminatedBy = m.winner_id;
     }
 
     if (m.outcome_type === "score" && m.games.length > 0) {
@@ -175,8 +176,19 @@ export function topTied<T>(items: T[], value: (x: T) => number): T[] {
   return items.filter((x) => value(x) === best);
 }
 
-/** How far into the tournament a round sits, for breaking ties on match records. */
-export const ROUND_ORDER: Record<Round, number> = { judge: -1, G: 0, R1: 1, R16: 2, QF: 3, SF: 4, F: 5 };
+/** How far into the tournament a round sits, for breaking ties on match records.
+ * The third-place match is played after the semifinals and before the final,
+ * and it is ordered where it is played. */
+export const ROUND_ORDER: Record<Round, number> = {
+  judge: -1,
+  G: 0,
+  R1: 1,
+  R16: 2,
+  QF: 3,
+  SF: 4,
+  "3P": 5,
+  F: 6,
+};
 
 /**
  * Everyone still level after a metric *and* a tie-break.

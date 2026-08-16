@@ -4,14 +4,17 @@ import { isMalKKleeja } from "@/lib/validation";
 /** How many games a round's series is played to. The knockout gets longer the
  * deeper it runs: the round of 16 and the quarterfinals are best of 3 (first to
  * 2), the semifinals best of 5 (first to 3), and the final best of 7 (first to
- * 4). A group match is a single game to 11, and the judge exhibition is a
- * one-off outside the tree. */
+ * 4). The third-place match is played at the semifinal's length, best of 5 —
+ * the same two players' last match was, and losing it shouldn't be worth less
+ * work than reaching it. A group match is a single game to 11, and the judge
+ * exhibition is a one-off outside the tree. */
 export function gamesToWin(round: Round): number {
   switch (round) {
     case "G":
     case "judge":
       return 1;
     case "SF":
+    case "3P":
       return 3;
     case "F":
       return 4;
@@ -96,6 +99,7 @@ export const ROUND_LABELS_AR: Record<Round, string> = {
   R16: "دور الـ16",
   QF: "ربع النهائي",
   SF: "نصف النهائي",
+  "3P": "مباراة المركز الثالث",
   F: "النهائي",
   judge: "مباراة القاضي",
 };
@@ -113,6 +117,7 @@ export const ROUND_LABELS_EN: Record<Round, string> = {
   R16: "Round of 16",
   QF: "Quarterfinal",
   SF: "Semifinal",
+  "3P": "Third-place match",
   F: "Final",
   judge: "Judge Match",
 };

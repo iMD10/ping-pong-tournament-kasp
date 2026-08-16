@@ -12,6 +12,7 @@ import { LiveDrawPanel } from "@/components/admin/LiveDrawPanel";
 import { GroupsPanel } from "@/components/admin/GroupsPanel";
 import { MatchAdminRow } from "@/components/admin/MatchAdminRow";
 import { JudgeMatchPanel } from "@/components/admin/JudgeMatchPanel";
+import { ThirdPlacePanel } from "@/components/admin/ThirdPlacePanel";
 import { ShamatPanel } from "@/components/admin/ShamatPanel";
 import { StatementsPanel } from "@/components/admin/StatementsPanel";
 import { CollapsibleSection } from "@/components/CollapsibleSection";
@@ -26,7 +27,7 @@ import type {
   TournamentState,
 } from "@/lib/supabase/types";
 
-const ROUND_RANK: Record<string, number> = { G: -1, R1: 0, R16: 1, QF: 2, SF: 3, F: 4, judge: 5 };
+const ROUND_RANK: Record<string, number> = { G: -1, R1: 0, R16: 1, QF: 2, SF: 3, "3P": 4, F: 5, judge: 6 };
 
 export function AdminDashboard({
   players,
@@ -54,6 +55,10 @@ export function AdminDashboard({
   const format = state?.drawn ? savedFormat : pickedFormat;
   const groupsFormat = format === "groups";
   const knockoutStarted = matches.some((m) => m.round !== "G");
+  // A tree drawn before the third-place match existed doesn't have one, so it
+  // is offered a button; every tree drawn since comes with its own.
+  const thirdPlaceMissing =
+    matches.some((m) => m.round === "SF") && !matches.some((m) => m.round === "3P");
   // Shared by the draw panel and the by-hand arrangement, so the group count
   // and qualifier count mean the same thing in both.
   const groupSettings = useGroupSettings(players.length);
@@ -140,6 +145,8 @@ export function AdminDashboard({
         <StatementsPanel statements={statements} players={players} />
         <ShamatPanel state={state} />
       </div>
+
+      {thirdPlaceMissing && <ThirdPlacePanel />}
 
       <JudgeMatchPanel championId={state?.champion_id ?? null} judgeMatch={judgeMatch} players={players} />
 

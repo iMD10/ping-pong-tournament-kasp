@@ -1,5 +1,7 @@
-/** 'G' is a group-stage round-robin match; everything else is a knockout round. */
-export type Round = "G" | "R1" | "R16" | "QF" | "SF" | "F" | "judge";
+/** 'G' is a group-stage round-robin match; everything else is a knockout round.
+ * '3P' is the third-place match: it hangs off the tree rather than in it, and
+ * its two players are the losing semifinalists. */
+export type Round = "G" | "R1" | "R16" | "QF" | "SF" | "3P" | "F" | "judge";
 export type OutcomeType = "pending" | "score" | "absent" | "withdrew" | "bye";
 /** idle = not started, live = papers being read out, done = bracket built. */
 export type DrawStatus = "idle" | "live" | "done";

@@ -102,6 +102,13 @@ is settled. The bracket page shows it as its own card under the tree, and it
 counts in the stats like any other match — except for «طاح على يد», since
 neither player was knocked out by it.
 
+Once the final has a winner, the top of the leaderboard is the podium rather
+than a record: champion, runner-up, third-place winner, pinned in that order,
+with everyone else ranked by results underneath. Left to the record alone the
+runner-up drops below the third-place player — they played one match more and
+lost it, which is exactly what coming second is — so `rankStats` seats the three
+places the bracket handed out. Nothing is pinned until the final is settled.
+
 Correct a semifinal after the third-place match has been played and the
 third-place result is voided along with the players it was played between; the
 edit warning on `/admin` lists it before anything is wiped. A tournament drawn

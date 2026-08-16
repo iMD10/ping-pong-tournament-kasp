@@ -28,6 +28,21 @@ html {
   scroll-behavior: smooth;
 }
 
+/* ---------------------------------------------------------------------------
+   Arabic and letter-spacing.
+   Arabic is cursive: the letters inside a word are joined, and letter-spacing
+   opens a gap at every one of those joins, so a tracked word renders as a row
+   of loose, disconnected glyphs instead of a word. Negative tracking collides
+   them instead. Either way `tracking-*` is a Latin-only device, and every
+   tracked label on this site is a translated string, so the utilities are
+   switched off wholesale while the document is Arabic.
+   The selector outweighs a Tailwind utility (0,2,0 against 0,1,0), so the
+   `tracking-*` classes can stay on the elements and keep working in English.
+   --------------------------------------------------------------------------- */
+:root[lang="ar"] * {
+  letter-spacing: normal;
+}
+
 body {
   min-height: 100vh;
   background: rgb(var(--bg));

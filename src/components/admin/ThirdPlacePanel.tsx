@@ -28,7 +28,7 @@ export function ThirdPlacePanel() {
     <div className="liquid-glass-panel rounded-2xl p-5">
       <h2 className="font-medium text-fg">مباراة المركز الثالث</h2>
       <p className="mb-4 mt-1 text-xs text-fg/70">
-        بين خاسري نصف النهائي، أفضل من خمسة أشواط. اللاعبين ينزلون مكانهم أول ما ينتهي نصف
+        بين خاسري نصف النهائي، أفضل من ثلاثة أشواط. اللاعبين ينزلون مكانهم أول ما ينتهي نصف
         النهائي، وتنحسب بالإحصائيات مثل أي مباراة.
       </p>
       <button

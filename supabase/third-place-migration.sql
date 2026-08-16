@@ -8,7 +8,7 @@
 -- third-place fixture with the tree, and a tournament already drawn gets one
 -- from the «مباراة المركز الثالث» button on /admin. Its two players are the
 -- losing semifinalists, seated as each semifinal is settled, and the series is
--- best of 5 — the same length as the semifinal they just lost.
+-- best of 3.
 
 -- The list below is every round code the app writes, so this file is also the
 -- fix for `violates check constraint "valid_round"` on any other round — a

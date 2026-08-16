@@ -14,7 +14,7 @@ import type { Dict } from "@/lib/i18n/dictionary";
 // them, so it filters on the schedule rather than on the match's state.
 type StatusFilter = "all" | "today" | "live" | "upcoming" | "finished";
 
-const ROUND_ORDER: Round[] = ["G", "R1", "R16", "QF", "SF", "F"];
+const ROUND_ORDER: Round[] = ["G", "R1", "R16", "QF", "SF", "3P", "F"];
 
 /** The tournament whole, group matches included — the one view that answers
  * "when do I play" and "what was the score" without reading a tree. */

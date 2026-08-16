@@ -38,7 +38,14 @@ export function BracketView({
   // the tables and the tree each get their own view. Every match in one flat
   // feed, group matches included, is its own page at /matches.
   const groups = useMemo(() => groupsFromMatches(allMatches, tiebreaks), [allMatches, tiebreaks]);
-  const knockout = useMemo(() => allMatches.filter((m) => m.round !== "G"), [allMatches]);
+  // The third-place match is knockout, but it isn't in the tree: nothing feeds
+  // it a winner, so it would have no branch to sit on. It gets its own card
+  // under the tree instead.
+  const knockout = useMemo(
+    () => allMatches.filter((m) => m.round !== "G" && m.round !== "3P"),
+    [allMatches]
+  );
+  const thirdPlace = useMemo(() => allMatches.find((m) => m.round === "3P") ?? null, [allMatches]);
   const hasGroups = groups.length > 0;
   const knockoutStarted = knockout.length > 0;
 
@@ -117,6 +124,14 @@ export function BracketView({
         ) : (
           <p className="py-10 text-center text-sm text-fg/70">{emptyTree}</p>
         ))}
+
+      {/* Waits for a beaten semifinalist: two TBDs under the tree say nothing
+          the tree doesn't already say. */}
+      {view === "tree" && thirdPlace && !!(thirdPlace.player1_id || thirdPlace.player2_id) && (
+        <div className="mx-auto w-full max-w-sm">
+          <MatchCard match={thirdPlace} players={players} t={t} locale={locale} />
+        </div>
+      )}
     </div>
   );
 }

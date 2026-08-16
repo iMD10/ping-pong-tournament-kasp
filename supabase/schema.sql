@@ -17,7 +17,7 @@ create table if not exists players (
 -- ---------------------------------------------------------------------------
 create table if not exists matches (
   id uuid primary key default gen_random_uuid(),
-  round text not null,                -- 'G','R1','R16','QF','SF','F','judge'
+  round text not null,                -- 'G','R1','R16','QF','SF','3P','F','judge'
   bracket_slot int not null default 0, -- ordering within round
   -- Group stage only: which group this round-robin match belongs to (0-based).
   -- Null for every knockout match.
@@ -25,8 +25,8 @@ create table if not exists matches (
   player1_id uuid references players(id) on delete set null,
   player2_id uuid references players(id) on delete set null,
   -- Array of games: [{ score1, score2, decider_score1?, decider_score2? }, ...]
-  -- 'G' is a single game; 'R1'/'R16'/'QF' are best of 3, 'SF' best of 5, and
-  -- 'F' best of 7.
+  -- 'G' is a single game; 'R1'/'R16'/'QF' are best of 3, 'SF' and the
+  -- third-place match '3P' best of 5, and 'F' best of 7.
   games jsonb not null default '[]'::jsonb,
   winner_id uuid references players(id) on delete set null,
   outcome_type text not null default 'pending', -- pending | score | absent | withdrew | bye
@@ -45,10 +45,15 @@ create table if not exists matches (
 alter table matches add column if not exists group_no int;
 
 -- Dropped first so re-running this file doesn't error on the older constraint,
--- which didn't know about the group round.
+-- which didn't know about the group round or the third-place match.
+--
+-- '3P' is the third-place match: one row per tournament, played by the two
+-- beaten semifinalists, best of 5. Nothing feeds it by next_match_id and it
+-- feeds nothing — it hangs off the tree, and its players are written by the
+-- app as each semifinal is settled.
 alter table matches drop constraint if exists valid_round;
 alter table matches add constraint valid_round
-  check (round in ('G','R1','R16','QF','SF','F','judge'));
+  check (round in ('G','R1','R16','QF','SF','3P','F','judge'));
 
 create index if not exists idx_matches_round on matches (round);
 create index if not exists idx_matches_next on matches (next_match_id);

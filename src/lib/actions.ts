@@ -157,7 +157,28 @@ async function insertBracket(
     if (error) return { ok: false, error: error.message };
   }
 
+  // A tree deep enough to have semifinals gets a third-place match with it.
+  if (draft.some((m) => m.round === "SF")) {
+    const res = await insertThirdPlaceMatch(supabase);
+    if (!res.ok) return res;
+  }
+
   revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+/** Writes the empty third-place fixture. Its two slots stay TBD until the
+ * semifinals hand it their losers. */
+async function insertThirdPlaceMatch(
+  supabase: Awaited<ReturnType<typeof requireAdmin>>
+): Promise<ActionResult> {
+  const { error } = await supabase.from("matches").insert({
+    round: "3P" as const,
+    bracket_slot: 0,
+    outcome_type: "pending" as const,
+    games: [] as Game[],
+  });
+  if (error) return { ok: false, error: error.message };
   return { ok: true, data: null };
 }
 
@@ -636,10 +657,13 @@ export async function setMatchPlayers(
   }
 
   // One player alone is a bye only when nothing can ever fill the other slot.
-  // A group match has no feeders at all, but it is still a fixture, not a bye.
+  // A group match has no feeders at all, but it is still a fixture, not a bye —
+  // and neither is the third-place match, whose players arrive from the
+  // semifinals by way of losing them, not through a next-match link.
   const lone = player1Id && !player2Id ? player1Id : !player1Id && player2Id ? player2Id : null;
+  const canWalkThrough = match.round !== "G" && match.round !== "3P";
   const winnerId =
-    match.round !== "G" && lone && (await slotIsOrphaned(supabase, matchId, player1Id ? 2 : 1))
+    canWalkThrough && lone && (await slotIsOrphaned(supabase, matchId, player1Id ? 2 : 1))
       ? lone
       : null;
 
@@ -688,11 +712,70 @@ async function slotIsOrphaned(
   return !data || data.length === 0;
 }
 
+/**
+ * Re-seats the third-place match from the semifinals as they stand right now.
+ *
+ * Nothing feeds the bronze match by next_match_id — it is fed by who *lost*,
+ * which the tree has no wiring for — so it is rebuilt from both semifinals
+ * every time one of them changes. Reading the rows fresh keeps it idempotent:
+ * a cleared semifinal empties the slot again, and a corrected one swaps the
+ * name for the right loser.
+ *
+ * A semifinal nobody played (a walkthrough bye) has no loser, so that slot
+ * stays empty. A bronze already played is only touched when the semifinals no
+ * longer name the two people who played it — then it is voided along with them,
+ * the same way a changed winner voids what was built on it downstream.
+ */
+async function seatThirdPlace(supabase: Awaited<ReturnType<typeof requireAdmin>>) {
+  const { data: bronze } = await supabase.from("matches").select("*").eq("round", "3P").maybeSingle();
+  if (!bronze) return;
+
+  const { data: semis } = await supabase
+    .from("matches")
+    .select("*")
+    .eq("round", "SF")
+    .order("bracket_slot", { ascending: true });
+
+  const loserOf = (m: Match | undefined): string | null => {
+    if (!m || !m.winner_id || !m.player1_id || !m.player2_id) return null;
+    if (m.outcome_type === "bye") return null;
+    return m.winner_id === m.player1_id ? m.player2_id : m.player1_id;
+  };
+
+  // The top half of the tree takes the top slot, so the bronze card reads the
+  // same way round as the semifinals above it.
+  const p1 = loserOf((semis ?? [])[0] as Match | undefined);
+  const p2 = loserOf((semis ?? [])[1] as Match | undefined);
+  if (p1 === bronze.player1_id && p2 === bronze.player2_id) return;
+
+  const played = (bronze.games as Game[]).length > 0 || bronze.outcome_type !== "pending";
+
+  await supabase
+    .from("matches")
+    .update({
+      player1_id: p1,
+      player2_id: p2,
+      ...(played
+        ? {
+            games: [] as Game[],
+            winner_id: null,
+            outcome_type: "pending" as const,
+            outcome_reason: null,
+            is_live: false,
+          }
+        : {}),
+    })
+    .eq("id", bronze.id);
+}
+
 async function propagateWinner(
   supabase: Awaited<ReturnType<typeof requireAdmin>>,
   match: Match,
   winnerId: string | null
 ) {
+  // Every path that settles or unsettles a semifinal comes through here, so
+  // this is where the beaten semifinalist is handed to the bronze match.
+  if (match.round === "SF") await seatThirdPlace(supabase);
   if (!match.next_match_id || !match.next_match_slot) return;
   const field = match.next_match_slot === 1 ? "player1_id" : "player2_id";
   await supabase.from("matches").update({ [field]: winnerId }).eq("id", match.next_match_id);
@@ -853,6 +936,15 @@ export async function previewEditImpact(matchId: string, newWinnerId: string | n
     cursor = next.next_match_id;
   }
 
+  // The third-place match isn't on that chain, but it is built on this
+  // semifinal's loser, so a different winner here voids it just the same.
+  if (match.round === "SF") {
+    const { data: bronze } = await supabase.from("matches").select("*").eq("round", "3P").maybeSingle();
+    if (bronze && (bronze.winner_id || (bronze.games as Game[]).length > 0)) {
+      affected.push({ id: bronze.id, round: bronze.round });
+    }
+  }
+
   return { ok: true, data: { sameWinner: false, affected } };
 }
 
@@ -892,6 +984,8 @@ async function voidDownstream(
     if (next.round === "F") {
       await supabase.from("tournament_state").update({ champion_id: null }).eq("id", 1);
     }
+    // A voided semifinal takes its loser back out of the third-place match.
+    if (next.round === "SF") await seatThirdPlace(supabase);
 
     cursor = nextCursor;
     firstHop = false;
@@ -1047,6 +1141,34 @@ export async function removeStatement(id: string): Promise<ActionResult> {
   const supabase = await requireAdmin();
   const { error } = await supabase.from("statements").delete().eq("id", id);
   if (error) return { ok: false, error: error.message };
+  revalidatePath("/", "layout");
+  return { ok: true, data: null };
+}
+
+// ---------------------------------------------------------------------------
+// Third-place match — «مباراة المركز الثالث»
+// ---------------------------------------------------------------------------
+
+/**
+ * Adds the third-place match to a tree that was drawn before it existed. Every
+ * new draw gets one with the tree, so this is only ever the catch-up button;
+ * it seats whichever semifinal losers are already known.
+ */
+export async function createThirdPlaceMatch(): Promise<ActionResult> {
+  const supabase = await requireAdmin();
+
+  const { data: existing } = await supabase.from("matches").select("id").eq("round", "3P").maybeSingle();
+  if (existing) return { ok: false, error: "مباراة المركز الثالث موجودة من قبل" };
+
+  const { data: semis, error: sfErr } = await supabase.from("matches").select("id").eq("round", "SF");
+  if (sfErr) return { ok: false, error: sfErr.message };
+  if (!semis || semis.length === 0) return { ok: false, error: "ما به نصف نهائي، ما به مركز ثالث" };
+
+  const res = await insertThirdPlaceMatch(supabase);
+  if (!res.ok) return res;
+
+  await seatThirdPlace(supabase);
+
   revalidatePath("/", "layout");
   return { ok: true, data: null };
 }

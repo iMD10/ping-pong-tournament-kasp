@@ -52,12 +52,16 @@ the login screen behind it is the second layer of protection.
   database created before that feature (already part of `schema.sql`).
 - `supabase/group-tiebreak-migration.sql` — just the hand-picked qualifiers
   column, for a database created before that feature (also in `schema.sql`).
+- `supabase/third-place-migration.sql` — just the widened round constraint that
+  lets the third-place match (`'3P'`) exist, for a database created before it
+  (also in `schema.sql`).
 - `src/lib/validation.ts` — the scoring rulebook (11-x, 11-0 shutout, 10-10 decider).
 - `src/lib/bracket.ts` — random draw + bye placement + tree generation.
 - `src/lib/groups.ts` — group draw, round-robin fixtures, standings, the
   hand-picked qualifiers that settle a tie, and the seeding that turns
   qualifiers into a knockout tree.
-- `src/lib/match.ts` — series lengths per round (best of 3 / 5 / 7), «ما لك كليجا» detection.
+- `src/lib/match.ts` — series lengths per round (best of 3 / 5 / 7, and the
+  third-place match at best of 5), «ما لك كليجا» detection.
 - `src/lib/time.ts` — the tournament clock: every match time is written and read
   in `Asia/Riyadh`, whatever zone the device or the server happens to be in.
 - `src/lib/actions.ts` — all admin server actions (draw, scoring, edit/recompute, reset).
@@ -86,6 +90,25 @@ The admin picks one before the draw, on `/admin`:
 The knockout tree is built once, from the tables as they stand at that moment,
 so results are worth checking before pressing the button.
 
+### The third-place match
+
+Any tree deep enough to have semifinals is drawn with a third-place match
+(round `3P`, best of 5 — the same length as the semifinal that sent them there).
+It hangs off the tree rather than sitting in it: nothing feeds it a winner, so
+its two slots are filled with whoever *lost* the semifinals, seated as each one
+is settled. The bracket page shows it as its own card under the tree, and it
+counts in the stats like any other match — except for «طاح على يد», since
+neither player was knocked out by it.
+
+Correct a semifinal after the third-place match has been played and the
+third-place result is voided along with the players it was played between; the
+edit warning on `/admin` lists it before anything is wiped. A tournament drawn
+before this feature existed has no such match, so `/admin` offers a button to
+add one — run `supabase/third-place-migration.sql` first.
+
+There is no third prize. The match is played for the place itself, which is
+what `/prize` says on it.
+
 ## 7. Fixing a match after the fact
 
 The match board on `/admin` shows what's on the table and what's still to play —
@@ -110,7 +133,10 @@ thing to change.
 
 ## 8. Still open (see original spec)
 
-- Real funders / prize copy for 2nd & 3rd place.
+- The champion takes a box of kleeja and a Claude subscription; second place has
+  no prize, and third place is a match rather than a prize. If a real 2nd/3rd
+  prize ever appears, the copy lives in `dict.*.prize` in
+  `src/lib/i18n/dictionary.ts` and the page in `src/app/prize/page.tsx`.
 - Event date for the homepage countdown (wire into `tournament_state.event_date`).
 - Referee profile page for عبدالله الهليس.
 - Roster is entered from the admin page — no seed data included.

@@ -8,6 +8,7 @@ import { HeroBadge } from "@/components/HeroBadge";
 import { HeroText } from "@/components/HeroText";
 import { BottomLeftCard } from "@/components/BottomLeftCard";
 import { BottomRightCorner } from "@/components/BottomRightCorner";
+import { ClosingPhoto } from "@/components/ClosingPhoto";
 import { OnAirBanner } from "@/components/OnAirBanner";
 import { getLang, getT } from "@/lib/i18n/server";
 
@@ -87,6 +88,13 @@ export default async function HomePage() {
           <BottomRightCorner title={''} subtitle={t.home.ctaRules} href="/rules" />
         )}
       </section>
+
+      {/* Finals night, everyone in one frame. It follows the champion
+          headline rather than leading the page, so the site still opens on
+          the tournament and not on its scrapbook. */}
+      {champion && (
+        <ClosingPhoto title={t.home.photoTitle} caption={t.home.photoCaption} alt={t.home.photoAlt} />
+      )}
 
       <section className="mx-auto max-w-5xl px-4 py-14 sm:px-12 sm:py-16">
         {!state?.drawn ? (

@@ -29,6 +29,10 @@ export const dict = {
       championTitle: "البطل",
       championLede: "كرتون الكليجا واشتراك كلود صاروا من نصيبه. الباقي… الله يعوّضهم.",
       statements: "تصريحات اللاعبين",
+      photoTitle: "صورة الختام",
+      photoCaption:
+        "من أول قرعة إلى آخر نقطة، وكل من وقف يتفرج بينهم. البطولة خلصت، والصورة باقية.",
+      photoAlt: "لاعبو ومتفرجو البطولة بصورة جماعية بعد النهائي، والبطل والوصيف بميدالياتهم وكرتون الكليجا.",
     },
     bracket: {
       title: "مسار البطولة",
@@ -241,6 +245,10 @@ export const dict = {
       championTitle: "Champion",
       championLede: "The kleeja and the Claude subscription are theirs. Everyone else, better luck next time.",
       statements: "Player statements",
+      photoTitle: "The closing photo",
+      photoCaption:
+        "From the first draw to the last point, everyone who played and everyone who watched. The tournament is over; the photo stays.",
+      photoAlt: "The players and spectators together after the final, the champion and runner-up wearing their medals beside the box of kleeja.",
     },
     bracket: {
       title: "Bracket",
